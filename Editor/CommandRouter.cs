@@ -60,6 +60,9 @@ namespace PlayCaller.Editor
 				case "execute_menu_item":
 					return MenuItemHandler.Handle(command);
 
+				case "get_editor_state":
+					return EditorStateHandler.Handle(command);
+
 				default:
 					return PlayCallerResponse.Error(command.Id,
 						$"Unknown command type: {command.Type}", "UNKNOWN_COMMAND");

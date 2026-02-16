@@ -548,6 +548,22 @@ async def playcaller_execute_menu_item(menuPath: str) -> str:
         return f"Execute menu item failed: {exc}"
 
 
+# -- get_editor_state -------------------------------------------------------
+
+@mcp.tool()
+async def playcaller_get_editor_state() -> str:
+    """Get the current Unity Editor state.
+
+    Returns isPlaying, isPaused, isCompiling, activeScene, activeScenePath,
+    screenWidth, screenHeight, unityVersion, and platform.
+    """
+    try:
+        result = await unity.send_command("get_editor_state")
+        return json.dumps(result, indent=2, ensure_ascii=False)
+    except Exception as exc:
+        return f"Get editor state failed: {exc}"
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
