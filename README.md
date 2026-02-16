@@ -45,16 +45,6 @@ Game View (EventSystem / Physics Raycast)
 }
 ```
 
-または `file:` 参照（git subtree で取り込んだ場合）:
-
-```json
-{
-  "dependencies": {
-    "com.takashicompany.playcaller": "file:../playcaller"
-  }
-}
-```
-
 #### Node.js サーバーのビルド
 
 ```bash
@@ -188,52 +178,4 @@ Unity コンソールログを取得します。
 Unity 座標 (x * scaleX, screenHeight - y * scaleY)
 ```
 
-## 典型的な使用フロー
 
-```
-1. playcaller_playmode(action: "play")     -- Play Mode 開始
-2. playcaller_screenshot()                  -- 画面確認
-3. playcaller_tap(x: 164, y: 280)          -- ボタンタップ
-4. playcaller_wait(ms: 500)                -- アニメーション待ち
-5. playcaller_screenshot()                  -- 結果確認
-6. playcaller_playmode(action: "stop")     -- Play Mode 終了
-```
-
-## ディレクトリ構成
-
-```
-playcaller/
-├── package.json              # UPM パッケージ定義
-├── Editor/                   # Unity C# (Editor only)
-│   ├── PlayCaller.Editor.asmdef
-│   ├── PlayCallerServer.cs   # TCP サーバー (127.0.0.1:6500)
-│   ├── CommandRouter.cs      # コマンドディスパッチ
-│   ├── Models/
-│   │   ├── PlayCallerCommand.cs
-│   │   └── PlayCallerResponse.cs
-│   └── Handlers/
-│       ├── InputSimulationHandler.cs  # tap/drag/flick
-│       ├── ScreenshotHandler.cs       # スクリーンショット取得
-│       ├── PlayModeHandler.cs         # Play Mode 制御
-│       ├── WaitHandler.cs             # 待機
-│       └── ConsoleLogHandler.cs       # コンソールログ
-└── Server~/                  # Node.js MCP サーバー (~ = Unity 無視)
-    ├── package.json
-    ├── tsconfig.json
-    └── src/
-        ├── index.ts           # エントリポイント (stdio transport)
-        ├── server.ts          # MCP サーバー + ツール登録
-        ├── unity-connection.ts # TCP クライアント + 再接続
-        └── tools/
-            ├── tap.ts
-            ├── drag.ts
-            ├── flick.ts
-            ├── screenshot.ts
-            ├── playmode.ts
-            ├── wait.ts
-            └── console-log.ts
-```
-
-## License
-
-MIT
