@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEditor;
@@ -9,6 +10,32 @@ namespace PlayCaller.Editor.Handlers
 {
 	public static class ScreenshotHandler
 	{
+		static readonly string ScreenshotDir = Path.Combine(
+			Path.GetDirectoryName(Application.dataPath), "Temp", "PlayCaller", "Screenshots");
+		const string ScreenshotFileName = "screenshot.png";
+
+		/// <summary>PNG を Temp/PlayCaller/Screenshots/screenshot.png に保存し、絶対パスを返す。</summary>
+		static string SaveToFile(byte[] imageBytes)
+		{
+			Directory.CreateDirectory(ScreenshotDir);
+			string filePath = Path.Combine(ScreenshotDir, ScreenshotFileName);
+			File.WriteAllBytes(filePath, imageBytes);
+			return filePath;
+		}
+
+		/// <summary>スクリーンショット成功時のレスポンスを生成する。</summary>
+		static string MakeSuccessResponse(string commandId, string filePath, int width, int height)
+		{
+			return PlayCallerResponse.Success(commandId, new
+			{
+				filePath = filePath,
+				width = width,
+				height = height,
+				screenWidth = Screen.width,
+				screenHeight = Screen.height,
+			});
+		}
+
 		/// <summary>
 		/// Play Mode 中は ScreenCapture.CaptureScreenshotAsTexture() を使い、
 		/// Screen Space Overlay の Canvas UI を含むゲーム画面全体をキャプチャする。
@@ -113,17 +140,8 @@ namespace PlayCaller.Editor.Handlers
 					yield break;
 				}
 
-				string base64 = Convert.ToBase64String(imageBytes);
-
-				tcs.TrySetResult(PlayCallerResponse.Success(commandId, new
-				{
-					base64 = base64,
-					width = captureWidth,
-					height = captureHeight,
-					screenWidth = Screen.width,
-					screenHeight = Screen.height,
-					fileSize = imageBytes.Length
-				}));
+				string filePath = SaveToFile(imageBytes);
+				tcs.TrySetResult(MakeSuccessResponse(commandId, filePath, captureWidth, captureHeight));
 			}
 			catch (Exception ex)
 			{
@@ -193,17 +211,8 @@ namespace PlayCaller.Editor.Handlers
 					"Failed to encode screenshot", "ENCODE_ERROR");
 			}
 
-			string base64 = Convert.ToBase64String(imageBytes);
-
-			return PlayCallerResponse.Success(commandId, new
-			{
-				base64 = base64,
-				width = captureWidth,
-				height = captureHeight,
-				screenWidth = Screen.width,
-				screenHeight = Screen.height,
-				fileSize = imageBytes.Length
-			});
+			string filePath = SaveToFile(imageBytes);
+			return MakeSuccessResponse(commandId, filePath, captureWidth, captureHeight);
 		}
 
 		/// <summary>

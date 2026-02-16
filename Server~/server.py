@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
-from mcp.types import ImageContent, TextContent
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -276,10 +275,10 @@ unity = UnityConnection()
 # -- screenshot -------------------------------------------------------------
 
 @mcp.tool()
-async def playcaller_screenshot(width: int = 0, height: int = 0) -> list[ImageContent | TextContent]:
+async def playcaller_screenshot(width: int = 0, height: int = 0) -> str:
     """Capture a screenshot of the Unity Game View.
 
-    Returns the image as base64-encoded PNG.
+    Returns the file path of the saved PNG screenshot.
     width/height: optional resolution in pixels (default: Game View size).
     """
     try:
@@ -289,20 +288,17 @@ async def playcaller_screenshot(width: int = 0, height: int = 0) -> list[ImageCo
         unity.last_screen_width = result.get("screenWidth", result["width"])
         unity.last_screen_height = result.get("screenHeight", result["height"])
 
-        return [
-            ImageContent(type="image", data=result["base64"], mimeType="image/png"),
-            TextContent(
-                type="text",
-                text=(
-                    f"Screenshot captured: {result['width']}x{result['height']} "
-                    f"(screen: {unity.last_screen_width}x{unity.last_screen_height}). "
-                    f"Input coordinates for tap/drag/flick should use the screenshot image coordinate system "
-                    f"({result['width']}x{result['height']}, top-left origin, Y-down)."
-                ),
-            ),
-        ]
+        file_path = result["filePath"]
+        return (
+            f"Screenshot saved: {file_path}\n"
+            f"Size: {result['width']}x{result['height']} "
+            f"(screen: {unity.last_screen_width}x{unity.last_screen_height}).\n"
+            f"Input coordinates for tap/drag/flick should use the screenshot image coordinate system "
+            f"({result['width']}x{result['height']}, top-left origin, Y-down).\n"
+            f"Use the Read tool to view the image file."
+        )
     except Exception as exc:
-        return [TextContent(type="text", text=f"Screenshot failed: {exc}")]
+        return f"Screenshot failed: {exc}"
 
 
 # -- tap --------------------------------------------------------------------
