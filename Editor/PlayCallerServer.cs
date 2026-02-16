@@ -36,6 +36,18 @@ namespace PlayCaller.Editor
 			System.IO.File.WriteAllText(GetPortFilePath(), port.ToString());
 		}
 
+		private static int ReadPortFile()
+		{
+			var path = GetPortFilePath();
+			if (System.IO.File.Exists(path))
+			{
+				var text = System.IO.File.ReadAllText(path).Trim();
+				if (int.TryParse(text, out var port) && port > 0)
+					return port;
+			}
+			return 0;
+		}
+
 		private static void DeletePortFile()
 		{
 			var path = GetPortFilePath();
@@ -47,8 +59,8 @@ namespace PlayCaller.Editor
 		{
 			Debug.Log("[PlayCaller] Initializing...");
 			EditorApplication.update += ProcessCommandQueue;
-			EditorApplication.quitting += Shutdown;
-			AssemblyReloadEvents.beforeAssemblyReload += Shutdown;
+			EditorApplication.quitting += OnQuitting;
+			AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
 			StartListener();
 		}
 
@@ -59,8 +71,21 @@ namespace PlayCaller.Editor
 				if (_listener != null) StopListener();
 
 				_cts = new CancellationTokenSource();
-				_listener = new TcpListener(IPAddress.Loopback, 0);
-				_listener.Start();
+
+				// 前回のポートファイルがあれば再利用を試みる
+				int preferredPort = ReadPortFile();
+				_listener = new TcpListener(IPAddress.Loopback, preferredPort);
+				try
+				{
+					_listener.Start();
+				}
+				catch (SocketException) when (preferredPort != 0)
+				{
+					// 前回のポートが使用中の場合、OS に割り当てさせる
+					_listener = new TcpListener(IPAddress.Loopback, 0);
+					_listener.Start();
+				}
+
 				var actualPort = ((IPEndPoint)_listener.LocalEndpoint).Port;
 				WritePortFile(actualPort);
 				Debug.Log($"[PlayCaller] TCP listening on 127.0.0.1:{actualPort}");
@@ -87,7 +112,6 @@ namespace PlayCaller.Editor
 				_listener = null;
 				_cts = null;
 				_listenerTask = null;
-				DeletePortFile();
 				Debug.Log("[PlayCaller] TCP listener stopped");
 			}
 			catch (Exception ex)
@@ -300,12 +324,20 @@ namespace PlayCaller.Editor
 			}
 		}
 
-		private static void Shutdown()
+		private static void OnBeforeAssemblyReload()
 		{
-			Debug.Log("[PlayCaller] Shutting down...");
+			Debug.Log("[PlayCaller] Assembly reload: stopping listener...");
 			StopListener();
 			EditorApplication.update -= ProcessCommandQueue;
-			EditorApplication.quitting -= Shutdown;
+		}
+
+		private static void OnQuitting()
+		{
+			Debug.Log("[PlayCaller] Quitting: shutting down...");
+			StopListener();
+			DeletePortFile();
+			EditorApplication.update -= ProcessCommandQueue;
+			EditorApplication.quitting -= OnQuitting;
 		}
 	}
 }
