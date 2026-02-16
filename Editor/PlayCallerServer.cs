@@ -251,15 +251,26 @@ namespace PlayCaller.Editor
 			ProcessCommandAsync(item.command, item.client);
 		}
 
+		private const int CommandTimeoutMs = 30000;
+
 		private static async void ProcessCommandAsync(PlayCallerCommand command, TcpClient client)
 		{
 			try
 			{
 				var response = CommandRouter.Route(command);
 
-				// If the handler returns a Task<string>, await it
+				// If the handler returns a Task<string>, await it with timeout
 				if (response is Task<string> asyncResponse)
 				{
+					var completed = await Task.WhenAny(asyncResponse, Task.Delay(CommandTimeoutMs));
+					if (completed != asyncResponse)
+					{
+						Debug.LogWarning($"[PlayCaller] Command {command?.Type} timed out after {CommandTimeoutMs}ms");
+						var errResp = PlayCallerResponse.Error(command?.Id, "Command timed out", "TIMEOUT");
+						if (client.Connected)
+							await SendFramedMessageAsync(client.GetStream(), errResp, CancellationToken.None);
+						return;
+					}
 					var result = await asyncResponse;
 					if (client.Connected)
 						await SendFramedMessageAsync(client.GetStream(), result, CancellationToken.None);
