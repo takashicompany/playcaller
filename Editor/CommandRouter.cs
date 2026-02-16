@@ -57,6 +57,9 @@ namespace PlayCaller.Editor
 				case "get_gameobject":
 					return GameObjectHandler.Handle(command);
 
+				case "execute_menu_item":
+					return MenuItemHandler.Handle(command);
+
 				default:
 					return PlayCallerResponse.Error(command.Id,
 						$"Unknown command type: {command.Type}", "UNKNOWN_COMMAND");

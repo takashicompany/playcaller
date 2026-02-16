@@ -530,6 +530,24 @@ async def playcaller_get_gameobject(path: str = "", instanceId: int = 0) -> str:
         return f"Get gameobject failed: {exc}"
 
 
+# -- execute_menu_item ------------------------------------------------------
+
+@mcp.tool()
+async def playcaller_execute_menu_item(menuPath: str) -> str:
+    """Execute a Unity Editor menu item.
+
+    menuPath: full menu path (e.g. "Assets/Refresh", "File/Save", "Edit/Play").
+    Returns whether the menu item was found and executed.
+    """
+    try:
+        result = await unity.send_command("execute_menu_item", {"menuPath": menuPath})
+        if result.get("executed"):
+            return f"Menu item executed: {result.get('menuPath')}"
+        return f"Execute menu item result: {json.dumps(result)}"
+    except Exception as exc:
+        return f"Execute menu item failed: {exc}"
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
