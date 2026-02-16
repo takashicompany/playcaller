@@ -8,7 +8,11 @@ namespace PlayCaller.Editor.Handlers
 		public static string Handle(PlayCallerCommand command)
 		{
 			AssetDatabase.Refresh();
-			return PlayCallerResponse.Success(command.Id, new { refreshed = true });
+			return PlayCallerResponse.Success(command.Id, new
+			{
+				refreshed = true,
+				isCompiling = EditorApplication.isCompiling
+			});
 		}
 	}
 }

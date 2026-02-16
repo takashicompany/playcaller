@@ -476,14 +476,27 @@ async def playcaller_refresh() -> str:
 
     Triggers AssetDatabase.Refresh() to reimport changed assets.
     Use after modifying files outside Unity to ensure changes are picked up.
+    If the refresh triggers script recompilation, waits for domain reload to complete.
     """
     try:
         result = await unity.send_command("refresh")
-        if result.get("refreshed"):
-            return "AssetDatabase refreshed successfully."
-        return f"Refresh result: {json.dumps(result)}"
     except Exception as exc:
-        return f"Refresh failed: {exc}"
+        # Connection lost during refresh likely means domain reload started
+        _log("Refresh command error (possible domain reload): %s", exc)
+        reconnected = await _wait_for_reconnect(unity, 30)
+        if reconnected:
+            return "AssetDatabase refreshed (domain reload completed, reconnected)."
+        return "AssetDatabase refresh triggered domain reload but reconnection timed out. Unity may still be compiling."
+
+    if result.get("isCompiling"):
+        # Compilation started — domain reload will follow, connection will drop
+        _log("Refresh triggered compilation, waiting for domain reload...")
+        reconnected = await _wait_for_reconnect(unity, 30)
+        if reconnected:
+            return "AssetDatabase refreshed (compilation and domain reload completed)."
+        return "AssetDatabase refreshed but compilation/domain reload timed out. Unity may still be compiling."
+
+    return "AssetDatabase refreshed successfully (no recompilation needed)."
 
 
 # -- get_hierarchy ----------------------------------------------------------
