@@ -15,7 +15,8 @@ namespace PlayCaller.Editor
 	[InitializeOnLoad]
 	public static class PlayCallerServer
 	{
-		private const int Port = 6500;
+		private const string PortFileName = "PlayCaller.port";
+		private const string SessionStateKey = "PlayCaller.Port";
 		private static TcpListener _listener;
 		private static CancellationTokenSource _cts;
 		private static Task _listenerTask;
@@ -25,12 +26,60 @@ namespace PlayCaller.Editor
 		private static readonly object _queueLock = new object();
 		private static bool _isProcessing;
 
+		private static string GetPortFilePath()
+		{
+			var projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
+			return System.IO.Path.Combine(projectRoot, "Temp", PortFileName);
+		}
+
+		private static void WritePortFile(int port)
+		{
+			System.IO.File.WriteAllText(GetPortFilePath(), port.ToString());
+		}
+
+		private static int ReadPortFile()
+		{
+			var path = GetPortFilePath();
+			if (System.IO.File.Exists(path))
+			{
+				var text = System.IO.File.ReadAllText(path).Trim();
+				if (int.TryParse(text, out var port) && port > 0)
+					return port;
+			}
+			return 0;
+		}
+
+		private static void DeletePortFile()
+		{
+			var path = GetPortFilePath();
+			if (System.IO.File.Exists(path))
+				System.IO.File.Delete(path);
+		}
+
+		/// <summary>
+		/// ポート取得の優先順位: SessionState > PortFile > 0 (OS割り当て)
+		/// SessionState はドメインリロードを跨いで値を保持するため、
+		/// リロード後も同じポートを使い続けられる。
+		/// </summary>
+		private static int GetPreferredPort()
+		{
+			int port = SessionState.GetInt(SessionStateKey, 0);
+			if (port > 0) return port;
+			return ReadPortFile();
+		}
+
+		private static void SavePort(int port)
+		{
+			SessionState.SetInt(SessionStateKey, port);
+			WritePortFile(port);
+		}
+
 		static PlayCallerServer()
 		{
 			Debug.Log("[PlayCaller] Initializing...");
 			EditorApplication.update += ProcessCommandQueue;
-			EditorApplication.quitting += Shutdown;
-			AssemblyReloadEvents.beforeAssemblyReload += Shutdown;
+			EditorApplication.quitting += OnQuitting;
+			AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
 			StartListener();
 		}
 
@@ -41,15 +90,33 @@ namespace PlayCaller.Editor
 				if (_listener != null) StopListener();
 
 				_cts = new CancellationTokenSource();
-				_listener = new TcpListener(IPAddress.Loopback, Port);
-				_listener.Start();
-				Debug.Log($"[PlayCaller] TCP listening on 127.0.0.1:{Port}");
+
+				int preferredPort = GetPreferredPort();
+				_listener = new TcpListener(IPAddress.Loopback, preferredPort);
+				_listener.Server.SetSocketOption(
+					SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+				try
+				{
+					_listener.Start();
+				}
+				catch (SocketException) when (preferredPort != 0)
+				{
+					// 前回のポートが使用不可の場合、OS に割り当てさせる
+					_listener = new TcpListener(IPAddress.Loopback, 0);
+					_listener.Server.SetSocketOption(
+						SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+					_listener.Start();
+				}
+
+				var actualPort = ((IPEndPoint)_listener.LocalEndpoint).Port;
+				SavePort(actualPort);
+				Debug.Log($"[PlayCaller] TCP listening on 127.0.0.1:{actualPort}");
 
 				_listenerTask = Task.Run(() => AcceptConnectionsAsync(_cts.Token));
 			}
 			catch (SocketException ex)
 			{
-				Debug.LogError($"[PlayCaller] Failed to start TCP listener on port {Port}: {ex.Message}");
+				Debug.LogError($"[PlayCaller] Failed to start TCP listener: {ex.Message}");
 			}
 			catch (Exception ex)
 			{
@@ -230,15 +297,26 @@ namespace PlayCaller.Editor
 			ProcessCommandAsync(item.command, item.client);
 		}
 
+		private const int CommandTimeoutMs = 30000;
+
 		private static async void ProcessCommandAsync(PlayCallerCommand command, TcpClient client)
 		{
 			try
 			{
 				var response = CommandRouter.Route(command);
 
-				// If the handler returns a Task<string>, await it
+				// If the handler returns a Task<string>, await it with timeout
 				if (response is Task<string> asyncResponse)
 				{
+					var completed = await Task.WhenAny(asyncResponse, Task.Delay(CommandTimeoutMs));
+					if (completed != asyncResponse)
+					{
+						Debug.LogWarning($"[PlayCaller] Command {command?.Type} timed out after {CommandTimeoutMs}ms");
+						var errResp = PlayCallerResponse.Error(command?.Id, "Command timed out", "TIMEOUT");
+						if (client.Connected)
+							await SendFramedMessageAsync(client.GetStream(), errResp, CancellationToken.None);
+						return;
+					}
 					var result = await asyncResponse;
 					if (client.Connected)
 						await SendFramedMessageAsync(client.GetStream(), result, CancellationToken.None);
@@ -268,12 +346,20 @@ namespace PlayCaller.Editor
 			}
 		}
 
-		private static void Shutdown()
+		private static void OnBeforeAssemblyReload()
 		{
-			Debug.Log("[PlayCaller] Shutting down...");
+			Debug.Log("[PlayCaller] Assembly reload: stopping listener...");
 			StopListener();
 			EditorApplication.update -= ProcessCommandQueue;
-			EditorApplication.quitting -= Shutdown;
+		}
+
+		private static void OnQuitting()
+		{
+			Debug.Log("[PlayCaller] Quitting: shutting down...");
+			StopListener();
+			DeletePortFile();
+			EditorApplication.update -= ProcessCommandQueue;
+			EditorApplication.quitting -= OnQuitting;
 		}
 	}
 }

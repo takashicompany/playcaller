@@ -48,6 +48,21 @@ namespace PlayCaller.Editor
 				case "flick":
 					return InputSimulationHandler.HandleFlick(command);
 
+				case "refresh":
+					return RefreshHandler.Handle(command);
+
+				case "get_hierarchy":
+					return HierarchyHandler.Handle(command);
+
+				case "get_gameobject":
+					return GameObjectHandler.Handle(command);
+
+				case "execute_menu_item":
+					return MenuItemHandler.Handle(command);
+
+				case "get_editor_state":
+					return EditorStateHandler.Handle(command);
+
 				default:
 					return PlayCallerResponse.Error(command.Id,
 						$"Unknown command type: {command.Type}", "UNKNOWN_COMMAND");
