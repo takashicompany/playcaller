@@ -506,6 +506,30 @@ async def playcaller_get_hierarchy(scene: str = "", maxDepth: int = 10) -> str:
         return f"Get hierarchy failed: {exc}"
 
 
+# -- get_gameobject ---------------------------------------------------------
+
+@mcp.tool()
+async def playcaller_get_gameobject(path: str = "", instanceId: int = 0) -> str:
+    """Get detailed information about a specific GameObject.
+
+    Returns name, instanceId, activeSelf, tag, layer, transform, and component list.
+    path: hierarchy path (e.g. "/Canvas/Button"). Uses GameObject.Find().
+    instanceId: instance ID from get_hierarchy. Specify either path or instanceId.
+    """
+    try:
+        params: dict[str, Any] = {}
+        if path:
+            params["path"] = path
+        if instanceId:
+            params["instanceId"] = instanceId
+        if not params:
+            return "Either 'path' or 'instanceId' parameter is required."
+        result = await unity.send_command("get_gameobject", params)
+        return json.dumps(result, indent=2, ensure_ascii=False)
+    except Exception as exc:
+        return f"Get gameobject failed: {exc}"
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
