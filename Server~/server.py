@@ -486,6 +486,26 @@ async def playcaller_refresh() -> str:
         return f"Refresh failed: {exc}"
 
 
+# -- get_hierarchy ----------------------------------------------------------
+
+@mcp.tool()
+async def playcaller_get_hierarchy(scene: str = "", maxDepth: int = 10) -> str:
+    """Get the GameObject hierarchy of a Unity scene.
+
+    Returns the tree of GameObjects with name, instanceId, activeSelf, and children.
+    scene: scene name (default: active scene).
+    maxDepth: max recursion depth (default 10).
+    """
+    try:
+        params: dict[str, Any] = {"maxDepth": maxDepth}
+        if scene:
+            params["scene"] = scene
+        result = await unity.send_command("get_hierarchy", params)
+        return json.dumps(result, indent=2, ensure_ascii=False)
+    except Exception as exc:
+        return f"Get hierarchy failed: {exc}"
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------

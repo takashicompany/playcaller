@@ -51,6 +51,9 @@ namespace PlayCaller.Editor
 				case "refresh":
 					return RefreshHandler.Handle(command);
 
+				case "get_hierarchy":
+					return HierarchyHandler.Handle(command);
+
 				default:
 					return PlayCallerResponse.Error(command.Id,
 						$"Unknown command type: {command.Type}", "UNKNOWN_COMMAND");
