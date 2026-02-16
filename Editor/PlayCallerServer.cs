@@ -15,7 +15,7 @@ namespace PlayCaller.Editor
 	[InitializeOnLoad]
 	public static class PlayCallerServer
 	{
-		private const int Port = 6500;
+		private const string PortFileName = "PlayCaller.port";
 		private static TcpListener _listener;
 		private static CancellationTokenSource _cts;
 		private static Task _listenerTask;
@@ -24,6 +24,24 @@ namespace PlayCaller.Editor
 			= new Queue<(PlayCallerCommand, TcpClient)>();
 		private static readonly object _queueLock = new object();
 		private static bool _isProcessing;
+
+		private static string GetPortFilePath()
+		{
+			var projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
+			return System.IO.Path.Combine(projectRoot, "Temp", PortFileName);
+		}
+
+		private static void WritePortFile(int port)
+		{
+			System.IO.File.WriteAllText(GetPortFilePath(), port.ToString());
+		}
+
+		private static void DeletePortFile()
+		{
+			var path = GetPortFilePath();
+			if (System.IO.File.Exists(path))
+				System.IO.File.Delete(path);
+		}
 
 		static PlayCallerServer()
 		{
@@ -41,15 +59,17 @@ namespace PlayCaller.Editor
 				if (_listener != null) StopListener();
 
 				_cts = new CancellationTokenSource();
-				_listener = new TcpListener(IPAddress.Loopback, Port);
+				_listener = new TcpListener(IPAddress.Loopback, 0);
 				_listener.Start();
-				Debug.Log($"[PlayCaller] TCP listening on 127.0.0.1:{Port}");
+				var actualPort = ((IPEndPoint)_listener.LocalEndpoint).Port;
+				WritePortFile(actualPort);
+				Debug.Log($"[PlayCaller] TCP listening on 127.0.0.1:{actualPort}");
 
 				_listenerTask = Task.Run(() => AcceptConnectionsAsync(_cts.Token));
 			}
 			catch (SocketException ex)
 			{
-				Debug.LogError($"[PlayCaller] Failed to start TCP listener on port {Port}: {ex.Message}");
+				Debug.LogError($"[PlayCaller] Failed to start TCP listener: {ex.Message}");
 			}
 			catch (Exception ex)
 			{
@@ -67,6 +87,7 @@ namespace PlayCaller.Editor
 				_listener = null;
 				_cts = null;
 				_listenerTask = null;
+				DeletePortFile();
 				Debug.Log("[PlayCaller] TCP listener stopped");
 			}
 			catch (Exception ex)

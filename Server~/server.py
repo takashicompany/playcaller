@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import struct
 import sys
+from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -21,7 +23,7 @@ from mcp.types import ImageContent, TextContent
 # Constants
 # ---------------------------------------------------------------------------
 UNITY_HOST = "127.0.0.1"
-UNITY_PORT = 6500
+PORT_FILE_NAME = "PlayCaller.port"
 COMMAND_TIMEOUT_S = 30
 RECONNECT_DELAY_S = 2
 MAX_RECONNECT_DELAY_S = 30
@@ -63,10 +65,11 @@ class UnityConnection:
         async with self._connect_lock:
             if self._connected:
                 return
-            _log("Connecting to Unity at %s:%s ...", UNITY_HOST, UNITY_PORT)
+            port = _read_port_from_file()
+            _log("Connecting to Unity at %s:%s ...", UNITY_HOST, port)
             try:
                 self._reader, self._writer = await asyncio.wait_for(
-                    asyncio.open_connection(UNITY_HOST, UNITY_PORT),
+                    asyncio.open_connection(UNITY_HOST, port),
                     timeout=10,
                 )
             except Exception as exc:
@@ -74,7 +77,7 @@ class UnityConnection:
             self._connected = True
             self._reconnect_attempts = 0
             self._recv_task = asyncio.create_task(self._receive_loop())
-            _log("Connected to Unity at %s:%s", UNITY_HOST, UNITY_PORT)
+            _log("Connected to Unity at %s:%s", UNITY_HOST, port)
 
     def disconnect(self) -> None:
         """Tear down the connection synchronously (best-effort)."""
@@ -215,6 +218,27 @@ class UnityConnection:
 
 def _log(fmt: str, *args: object) -> None:
     print(f"[playcaller] {fmt % args}", file=sys.stderr, flush=True)
+
+
+def _read_port_from_file() -> int:
+    """Read the Unity TCP port from the port file written by PlayCallerServer."""
+    project_dir = os.environ.get("UNITY_PROJECT_DIR")
+    if not project_dir:
+        raise RuntimeError(
+            "UNITY_PROJECT_DIR environment variable is not set. "
+            "Set it to the Unity project root directory."
+        )
+    port_file = Path(project_dir) / "Temp" / PORT_FILE_NAME
+    if not port_file.exists():
+        raise FileNotFoundError(
+            f"Port file not found: {port_file}. "
+            "Is the Unity Editor running with PlayCaller?"
+        )
+    text = port_file.read_text().strip()
+    try:
+        return int(text)
+    except ValueError:
+        raise ValueError(f"Invalid port number in {port_file}: {text!r}")
 
 
 async def _wait_for_reconnect(unity: UnityConnection, timeout_s: float) -> bool:
