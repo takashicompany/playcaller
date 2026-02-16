@@ -48,6 +48,9 @@ namespace PlayCaller.Editor
 				case "flick":
 					return InputSimulationHandler.HandleFlick(command);
 
+				case "refresh":
+					return RefreshHandler.Handle(command);
+
 				default:
 					return PlayCallerResponse.Error(command.Id,
 						$"Unknown command type: {command.Type}", "UNKNOWN_COMMAND");

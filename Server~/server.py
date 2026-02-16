@@ -468,6 +468,24 @@ async def playcaller_wait(ms: int = 0, frames: int = 0) -> str:
         return f"Wait failed: {exc}"
 
 
+# -- refresh ----------------------------------------------------------------
+
+@mcp.tool()
+async def playcaller_refresh() -> str:
+    """Refresh Unity AssetDatabase.
+
+    Triggers AssetDatabase.Refresh() to reimport changed assets.
+    Use after modifying files outside Unity to ensure changes are picked up.
+    """
+    try:
+        result = await unity.send_command("refresh")
+        if result.get("refreshed"):
+            return "AssetDatabase refreshed successfully."
+        return f"Refresh result: {json.dumps(result)}"
+    except Exception as exc:
+        return f"Refresh failed: {exc}"
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
