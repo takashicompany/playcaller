@@ -1,4 +1,4 @@
-# PlayCaller
+# Playcaller
 
 Unity Editor 上で動作するゲームに対して、座標ベースの入力シミュレーション（タップ・ドラッグ・フリック）を行う MCP サーバーです。
 
