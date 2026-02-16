@@ -16,6 +16,7 @@ namespace PlayCaller.Editor
 	public static class PlayCallerServer
 	{
 		private const string PortFileName = "PlayCaller.port";
+		private const string SessionStateKey = "PlayCaller.Port";
 		private static TcpListener _listener;
 		private static CancellationTokenSource _cts;
 		private static Task _listenerTask;
@@ -55,6 +56,24 @@ namespace PlayCaller.Editor
 				System.IO.File.Delete(path);
 		}
 
+		/// <summary>
+		/// ポート取得の優先順位: SessionState > PortFile > 0 (OS割り当て)
+		/// SessionState はドメインリロードを跨いで値を保持するため、
+		/// リロード後も同じポートを使い続けられる。
+		/// </summary>
+		private static int GetPreferredPort()
+		{
+			int port = SessionState.GetInt(SessionStateKey, 0);
+			if (port > 0) return port;
+			return ReadPortFile();
+		}
+
+		private static void SavePort(int port)
+		{
+			SessionState.SetInt(SessionStateKey, port);
+			WritePortFile(port);
+		}
+
 		static PlayCallerServer()
 		{
 			Debug.Log("[PlayCaller] Initializing...");
@@ -72,22 +91,25 @@ namespace PlayCaller.Editor
 
 				_cts = new CancellationTokenSource();
 
-				// 前回のポートファイルがあれば再利用を試みる
-				int preferredPort = ReadPortFile();
+				int preferredPort = GetPreferredPort();
 				_listener = new TcpListener(IPAddress.Loopback, preferredPort);
+				_listener.Server.SetSocketOption(
+					SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
 				try
 				{
 					_listener.Start();
 				}
 				catch (SocketException) when (preferredPort != 0)
 				{
-					// 前回のポートが使用中の場合、OS に割り当てさせる
+					// 前回のポートが使用不可の場合、OS に割り当てさせる
 					_listener = new TcpListener(IPAddress.Loopback, 0);
+					_listener.Server.SetSocketOption(
+						SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
 					_listener.Start();
 				}
 
 				var actualPort = ((IPEndPoint)_listener.LocalEndpoint).Port;
-				WritePortFile(actualPort);
+				SavePort(actualPort);
 				Debug.Log($"[PlayCaller] TCP listening on 127.0.0.1:{actualPort}");
 
 				_listenerTask = Task.Run(() => AcceptConnectionsAsync(_cts.Token));
