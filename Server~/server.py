@@ -119,6 +119,20 @@ class UnityConnection:
             return await asyncio.wait_for(fut, timeout=COMMAND_TIMEOUT_S)
         except asyncio.TimeoutError:
             self._pending.pop(cmd_id, None)
+            # Connection is likely dead — tear down and schedule reconnect
+            _log("Command %s timed out, marking connection as dead", cmd_type)
+            self._connected = False
+            if self._recv_task and not self._recv_task.done():
+                self._recv_task.cancel()
+            if self._writer:
+                self._writer.close()
+            self._reader = None
+            self._writer = None
+            for f in self._pending.values():
+                if not f.done():
+                    f.set_exception(ConnectionError("Connection reset after timeout"))
+            self._pending.clear()
+            self._schedule_reconnect()
             raise TimeoutError(f"Command {cmd_type} timed out after {COMMAND_TIMEOUT_S}s")
 
     # -- receive loop -------------------------------------------------------
@@ -209,6 +223,9 @@ class UnityConnection:
             await self.connect()
         except Exception as exc:
             _log("Reconnection failed: %s", exc)
+            if not self._disconnecting:
+                self._reconnect_task = None
+                self._schedule_reconnect()
 
 
 # ---------------------------------------------------------------------------
