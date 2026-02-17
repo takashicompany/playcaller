@@ -2,13 +2,13 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using PlayCaller.Editor.Models;
+using Playcaller.Editor.Models;
 
-namespace PlayCaller.Editor.Handlers
+namespace Playcaller.Editor.Handlers
 {
 	public static class HierarchyHandler
 	{
-		public static string Handle(PlayCallerCommand command)
+		public static string Handle(PlaycallerCommand command)
 		{
 			try
 			{
@@ -20,7 +20,7 @@ namespace PlayCaller.Editor.Handlers
 				{
 					scene = SceneManager.GetSceneByName(sceneName);
 					if (!scene.IsValid())
-						return PlayCallerResponse.Error(command.Id,
+						return PlaycallerResponse.Error(command.Id,
 							$"Scene not found: {sceneName}", "SCENE_NOT_FOUND");
 				}
 				else
@@ -35,7 +35,7 @@ namespace PlayCaller.Editor.Handlers
 					result.Add(BuildNode(go, 0, maxDepth));
 				}
 
-				return PlayCallerResponse.Success(command.Id, new
+				return PlaycallerResponse.Success(command.Id, new
 				{
 					scene = scene.name,
 					rootObjects = result
@@ -43,7 +43,7 @@ namespace PlayCaller.Editor.Handlers
 			}
 			catch (Exception ex)
 			{
-				return PlayCallerResponse.Error(command.Id,
+				return PlaycallerResponse.Error(command.Id,
 					$"Get hierarchy failed: {ex.Message}", "HIERARCHY_ERROR");
 			}
 		}

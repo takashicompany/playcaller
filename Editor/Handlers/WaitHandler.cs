@@ -1,13 +1,13 @@
 using System;
 using System.Threading.Tasks;
 using UnityEditor;
-using PlayCaller.Editor.Models;
+using Playcaller.Editor.Models;
 
-namespace PlayCaller.Editor.Handlers
+namespace Playcaller.Editor.Handlers
 {
 	public static class WaitHandler
 	{
-		public static object Handle(PlayCallerCommand command)
+		public static object Handle(PlaycallerCommand command)
 		{
 			try
 			{
@@ -16,7 +16,7 @@ namespace PlayCaller.Editor.Handlers
 
 				if (ms <= 0 && frames <= 0)
 				{
-					return PlayCallerResponse.Success(command.Id, new
+					return PlaycallerResponse.Success(command.Id, new
 					{
 						waited = "0ms"
 					});
@@ -34,7 +34,7 @@ namespace PlayCaller.Editor.Handlers
 			}
 			catch (Exception ex)
 			{
-				return PlayCallerResponse.Error(command.Id,
+				return PlaycallerResponse.Error(command.Id,
 					$"Wait failed: {ex.Message}", "WAIT_ERROR");
 			}
 		}
@@ -49,7 +49,7 @@ namespace PlayCaller.Editor.Handlers
 				if (EditorApplication.timeSinceStartup - start >= milliseconds / 1000.0)
 				{
 					EditorApplication.update -= Tick;
-					tcs.TrySetResult(PlayCallerResponse.Success(id, new
+					tcs.TrySetResult(PlaycallerResponse.Success(id, new
 					{
 						waited = $"{milliseconds}ms"
 					}));
@@ -71,7 +71,7 @@ namespace PlayCaller.Editor.Handlers
 				if (remainingFrames <= 0)
 				{
 					EditorApplication.update -= Tick;
-					tcs.TrySetResult(PlayCallerResponse.Success(id, new
+					tcs.TrySetResult(PlaycallerResponse.Success(id, new
 					{
 						waited = $"{frameCount} frames"
 					}));

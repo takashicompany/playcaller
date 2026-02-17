@@ -1,9 +1,9 @@
 using System;
 using UnityEngine;
-using PlayCaller.Editor.Models;
-using PlayCaller.Editor.Handlers;
+using Playcaller.Editor.Models;
+using Playcaller.Editor.Handlers;
 
-namespace PlayCaller.Editor
+namespace Playcaller.Editor
 {
 	public static class CommandRouter
 	{
@@ -11,17 +11,17 @@ namespace PlayCaller.Editor
 		/// Routes a command to the appropriate handler.
 		/// Returns either a string (sync) or Task&lt;string&gt; (async).
 		/// </summary>
-		public static object Route(PlayCallerCommand command)
+		public static object Route(PlaycallerCommand command)
 		{
 			if (command == null)
-				return PlayCallerResponse.Error(null, "Null command", "NULL_COMMAND");
+				return PlaycallerResponse.Error(null, "Null command", "NULL_COMMAND");
 
 			var type = command.Type?.ToLowerInvariant();
 
 			switch (type)
 			{
 				case "ping":
-					return PlayCallerResponse.Success(command.Id, new
+					return PlaycallerResponse.Success(command.Id, new
 					{
 						message = "pong",
 						timestamp = DateTime.UtcNow.ToString("o")
@@ -64,7 +64,7 @@ namespace PlayCaller.Editor
 					return EditorStateHandler.Handle(command);
 
 				default:
-					return PlayCallerResponse.Error(command.Id,
+					return PlaycallerResponse.Error(command.Id,
 						$"Unknown command type: {command.Type}", "UNKNOWN_COMMAND");
 			}
 		}

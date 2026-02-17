@@ -1,8 +1,8 @@
 using Newtonsoft.Json;
 
-namespace PlayCaller.Editor.Models
+namespace Playcaller.Editor.Models
 {
-	public static class PlayCallerResponse
+	public static class PlaycallerResponse
 	{
 		public static string Success(string id, object result)
 		{

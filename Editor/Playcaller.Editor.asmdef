@@ -1,6 +1,6 @@
 {
-    "name": "PlayCaller.Editor",
-    "rootNamespace": "PlayCaller.Editor",
+    "name": "Playcaller.Editor",
+    "rootNamespace": "Playcaller.Editor",
     "references": [],
     "includePlatforms": [
         "Editor"

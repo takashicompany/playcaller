@@ -1,9 +1,9 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace PlayCaller.Editor.Models
+namespace Playcaller.Editor.Models
 {
-	public class PlayCallerCommand
+	public class PlaycallerCommand
 	{
 		[JsonProperty("id")]
 		public string Id { get; set; }

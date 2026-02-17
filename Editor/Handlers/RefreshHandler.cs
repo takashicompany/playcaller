@@ -1,14 +1,14 @@
 using UnityEditor;
-using PlayCaller.Editor.Models;
+using Playcaller.Editor.Models;
 
-namespace PlayCaller.Editor.Handlers
+namespace Playcaller.Editor.Handlers
 {
 	public static class RefreshHandler
 	{
-		public static string Handle(PlayCallerCommand command)
+		public static string Handle(PlaycallerCommand command)
 		{
 			AssetDatabase.Refresh();
-			return PlayCallerResponse.Success(command.Id, new
+			return PlaycallerResponse.Success(command.Id, new
 			{
 				refreshed = true,
 				isCompiling = EditorApplication.isCompiling

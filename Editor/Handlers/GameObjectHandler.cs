@@ -2,13 +2,13 @@ using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
-using PlayCaller.Editor.Models;
+using Playcaller.Editor.Models;
 
-namespace PlayCaller.Editor.Handlers
+namespace Playcaller.Editor.Handlers
 {
 	public static class GameObjectHandler
 	{
-		public static string Handle(PlayCallerCommand command)
+		public static string Handle(PlaycallerCommand command)
 		{
 			try
 			{
@@ -28,13 +28,13 @@ namespace PlayCaller.Editor.Handlers
 				}
 				else
 				{
-					return PlayCallerResponse.Error(command.Id,
+					return PlaycallerResponse.Error(command.Id,
 						"Either 'path' or 'instanceId' parameter is required.", "MISSING_PARAM");
 				}
 
 				if (go == null)
 				{
-					return PlayCallerResponse.Error(command.Id,
+					return PlaycallerResponse.Error(command.Id,
 						$"GameObject not found.", "NOT_FOUND");
 				}
 
@@ -46,7 +46,7 @@ namespace PlayCaller.Editor.Handlers
 						components.Add(c.GetType().Name);
 				}
 
-				return PlayCallerResponse.Success(command.Id, new
+				return PlaycallerResponse.Success(command.Id, new
 				{
 					name = go.name,
 					instanceId = go.GetInstanceID(),
@@ -64,7 +64,7 @@ namespace PlayCaller.Editor.Handlers
 			}
 			catch (Exception ex)
 			{
-				return PlayCallerResponse.Error(command.Id,
+				return PlaycallerResponse.Error(command.Id,
 					$"Get gameobject failed: {ex.Message}", "GAMEOBJECT_ERROR");
 			}
 		}

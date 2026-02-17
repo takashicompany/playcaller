@@ -5,9 +5,9 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using UnityEditor;
-using PlayCaller.Editor.Models;
+using Playcaller.Editor.Models;
 
-namespace PlayCaller.Editor.Handlers
+namespace Playcaller.Editor.Handlers
 {
 	/// <summary>
 	/// Coordinate-based input simulation handler.
@@ -19,12 +19,12 @@ namespace PlayCaller.Editor.Handlers
 	{
 		#region Tap
 
-		public static object HandleTap(PlayCallerCommand command)
+		public static object HandleTap(PlaycallerCommand command)
 		{
 			try
 			{
 				if (!Application.isPlaying)
-					return PlayCallerResponse.Error(command.Id, "Play Mode is required for tap", "PLAY_MODE_REQUIRED");
+					return PlaycallerResponse.Error(command.Id, "Play Mode is required for tap", "PLAY_MODE_REQUIRED");
 
 				float x = command.Params?["x"]?.ToObject<float>() ?? 0;
 				float y = command.Params?["y"]?.ToObject<float>() ?? 0;
@@ -48,7 +48,7 @@ namespace PlayCaller.Editor.Handlers
 			}
 			catch (Exception ex)
 			{
-				return PlayCallerResponse.Error(command.Id, $"Tap failed: {ex.Message}", "TAP_ERROR");
+				return PlaycallerResponse.Error(command.Id, $"Tap failed: {ex.Message}", "TAP_ERROR");
 			}
 		}
 
@@ -56,7 +56,7 @@ namespace PlayCaller.Editor.Handlers
 		{
 			var eventSystem = EnsureEventSystem();
 			if (eventSystem == null)
-				return PlayCallerResponse.Error(id, "No EventSystem found", "NO_EVENT_SYSTEM");
+				return PlaycallerResponse.Error(id, "No EventSystem found", "NO_EVENT_SYSTEM");
 
 			var target = FindTargetAtPosition(unityScreenPos);
 			var pointer = CreatePointerEventData(eventSystem, unityScreenPos);
@@ -64,13 +64,13 @@ namespace PlayCaller.Editor.Handlers
 			string clickHandlerName = null;
 			if (target != null)
 			{
-				Debug.Log($"[PlayCaller.Tap] target={target.name}, path={GetGameObjectPath(target)}, unityScreenPos={unityScreenPos}");
+				Debug.Log($"[Playcaller.Tap] target={target.name}, path={GetGameObjectPath(target)}, unityScreenPos={unityScreenPos}");
 
 				// Check if there's a Button in the hierarchy
 				var btn = target.GetComponentInParent<Button>();
 				if (btn != null)
 				{
-					Debug.Log($"[PlayCaller.Tap] Found Button in parent: {btn.gameObject.name}, interactable={btn.interactable}, IsActive={btn.IsActive()}");
+					Debug.Log($"[Playcaller.Tap] Found Button in parent: {btn.gameObject.name}, interactable={btn.interactable}, IsActive={btn.IsActive()}");
 				}
 
 				var enterHandler = ExecuteEvents.ExecuteHierarchy(target, pointer, ExecuteEvents.pointerEnterHandler);
@@ -80,10 +80,10 @@ namespace PlayCaller.Editor.Handlers
 				var exitHandler = ExecuteEvents.ExecuteHierarchy(target, pointer, ExecuteEvents.pointerExitHandler);
 
 				clickHandlerName = clickHandler != null ? clickHandler.name : "null";
-				Debug.Log($"[PlayCaller.Tap] enter={enterHandler?.name}, down={downHandler?.name}, up={upHandler?.name}, click={clickHandler?.name}, exit={exitHandler?.name}");
+				Debug.Log($"[Playcaller.Tap] enter={enterHandler?.name}, down={downHandler?.name}, up={upHandler?.name}, click={clickHandler?.name}, exit={exitHandler?.name}");
 			}
 
-			return PlayCallerResponse.Success(id, new
+			return PlaycallerResponse.Success(id, new
 			{
 				tapped = target != null,
 				targetName = target != null ? target.name : null,
@@ -110,7 +110,7 @@ namespace PlayCaller.Editor.Handlers
 			var eventSystem = EnsureEventSystem();
 			if (eventSystem == null)
 			{
-				tcs.SetResult(PlayCallerResponse.Error(id, "No EventSystem found", "NO_EVENT_SYSTEM"));
+				tcs.SetResult(PlaycallerResponse.Error(id, "No EventSystem found", "NO_EVENT_SYSTEM"));
 				return tcs.Task;
 			}
 
@@ -138,7 +138,7 @@ namespace PlayCaller.Editor.Handlers
 						ExecuteEvents.ExecuteHierarchy(target, pointer, ExecuteEvents.pointerExitHandler);
 					}
 
-					tcs.TrySetResult(PlayCallerResponse.Success(id, new
+					tcs.TrySetResult(PlaycallerResponse.Success(id, new
 					{
 						tapped = target != null,
 						targetName = target != null ? target.name : null,
@@ -156,12 +156,12 @@ namespace PlayCaller.Editor.Handlers
 
 		#region Drag
 
-		public static object HandleDrag(PlayCallerCommand command)
+		public static object HandleDrag(PlaycallerCommand command)
 		{
 			try
 			{
 				if (!Application.isPlaying)
-					return PlayCallerResponse.Error(command.Id, "Play Mode is required for drag", "PLAY_MODE_REQUIRED");
+					return PlaycallerResponse.Error(command.Id, "Play Mode is required for drag", "PLAY_MODE_REQUIRED");
 
 				float fromX = command.Params?["fromX"]?.ToObject<float>() ?? 0;
 				float fromY = command.Params?["fromY"]?.ToObject<float>() ?? 0;
@@ -186,7 +186,7 @@ namespace PlayCaller.Editor.Handlers
 			}
 			catch (Exception ex)
 			{
-				return PlayCallerResponse.Error(command.Id, $"Drag failed: {ex.Message}", "DRAG_ERROR");
+				return PlaycallerResponse.Error(command.Id, $"Drag failed: {ex.Message}", "DRAG_ERROR");
 			}
 		}
 
@@ -196,7 +196,7 @@ namespace PlayCaller.Editor.Handlers
 			var eventSystem = EnsureEventSystem();
 			if (eventSystem == null)
 			{
-				tcs.SetResult(PlayCallerResponse.Error(id, "No EventSystem found", "NO_EVENT_SYSTEM"));
+				tcs.SetResult(PlaycallerResponse.Error(id, "No EventSystem found", "NO_EVENT_SYSTEM"));
 				return tcs.Task;
 			}
 
@@ -233,7 +233,7 @@ namespace PlayCaller.Editor.Handlers
 						ExecuteEvents.ExecuteHierarchy(target, pointer, ExecuteEvents.pointerUpHandler);
 					}
 
-					tcs.TrySetResult(PlayCallerResponse.Success(id, new
+					tcs.TrySetResult(PlaycallerResponse.Success(id, new
 					{
 						dragged = target != null,
 						targetName = target != null ? target.name : null,
@@ -265,12 +265,12 @@ namespace PlayCaller.Editor.Handlers
 
 		#region Flick
 
-		public static object HandleFlick(PlayCallerCommand command)
+		public static object HandleFlick(PlaycallerCommand command)
 		{
 			try
 			{
 				if (!Application.isPlaying)
-					return PlayCallerResponse.Error(command.Id, "Play Mode is required for flick", "PLAY_MODE_REQUIRED");
+					return PlaycallerResponse.Error(command.Id, "Play Mode is required for flick", "PLAY_MODE_REQUIRED");
 
 				float fromX = command.Params?["fromX"]?.ToObject<float>() ?? 0;
 				float fromY = command.Params?["fromY"]?.ToObject<float>() ?? 0;
@@ -297,7 +297,7 @@ namespace PlayCaller.Editor.Handlers
 			}
 			catch (Exception ex)
 			{
-				return PlayCallerResponse.Error(command.Id, $"Flick failed: {ex.Message}", "FLICK_ERROR");
+				return PlaycallerResponse.Error(command.Id, $"Flick failed: {ex.Message}", "FLICK_ERROR");
 			}
 		}
 

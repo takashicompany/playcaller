@@ -2,19 +2,19 @@ using System;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using PlayCaller.Editor.Models;
+using Playcaller.Editor.Models;
 
-namespace PlayCaller.Editor.Handlers
+namespace Playcaller.Editor.Handlers
 {
 	public static class EditorStateHandler
 	{
-		public static string Handle(PlayCallerCommand command)
+		public static string Handle(PlaycallerCommand command)
 		{
 			try
 			{
 				var activeScene = SceneManager.GetActiveScene();
 
-				return PlayCallerResponse.Success(command.Id, new
+				return PlaycallerResponse.Success(command.Id, new
 				{
 					isPlaying = EditorApplication.isPlaying,
 					isPaused = EditorApplication.isPaused,
@@ -29,7 +29,7 @@ namespace PlayCaller.Editor.Handlers
 			}
 			catch (Exception ex)
 			{
-				return PlayCallerResponse.Error(command.Id,
+				return PlaycallerResponse.Error(command.Id,
 					$"Get editor state failed: {ex.Message}", "EDITOR_STATE_ERROR");
 			}
 		}

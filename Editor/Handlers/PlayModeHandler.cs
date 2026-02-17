@@ -1,13 +1,13 @@
 using System;
 using UnityEngine;
 using UnityEditor;
-using PlayCaller.Editor.Models;
+using Playcaller.Editor.Models;
 
-namespace PlayCaller.Editor.Handlers
+namespace Playcaller.Editor.Handlers
 {
 	public static class PlayModeHandler
 	{
-		public static string Handle(PlayCallerCommand command)
+		public static string Handle(PlaycallerCommand command)
 		{
 			try
 			{
@@ -18,7 +18,7 @@ namespace PlayCaller.Editor.Handlers
 					case "play":
 						if (!EditorApplication.isPlaying)
 							EditorApplication.isPlaying = true;
-						return PlayCallerResponse.Success(command.Id, new
+						return PlaycallerResponse.Success(command.Id, new
 						{
 							isPlaying = true,
 							isPaused = EditorApplication.isPaused,
@@ -27,7 +27,7 @@ namespace PlayCaller.Editor.Handlers
 
 					case "pause":
 						EditorApplication.isPaused = !EditorApplication.isPaused;
-						return PlayCallerResponse.Success(command.Id, new
+						return PlaycallerResponse.Success(command.Id, new
 						{
 							isPlaying = EditorApplication.isPlaying,
 							isPaused = EditorApplication.isPaused,
@@ -37,7 +37,7 @@ namespace PlayCaller.Editor.Handlers
 					case "stop":
 						if (EditorApplication.isPlaying)
 							EditorApplication.isPlaying = false;
-						return PlayCallerResponse.Success(command.Id, new
+						return PlaycallerResponse.Success(command.Id, new
 						{
 							isPlaying = false,
 							isPaused = false,
@@ -45,7 +45,7 @@ namespace PlayCaller.Editor.Handlers
 						});
 
 					case "get_state":
-						return PlayCallerResponse.Success(command.Id, new
+						return PlaycallerResponse.Success(command.Id, new
 						{
 							isPlaying = EditorApplication.isPlaying,
 							isPaused = EditorApplication.isPaused,
@@ -56,13 +56,13 @@ namespace PlayCaller.Editor.Handlers
 						});
 
 					default:
-						return PlayCallerResponse.Error(command.Id,
+						return PlaycallerResponse.Error(command.Id,
 							$"Unknown playmode action: {action}", "INVALID_ACTION");
 				}
 			}
 			catch (Exception ex)
 			{
-				return PlayCallerResponse.Error(command.Id,
+				return PlaycallerResponse.Error(command.Id,
 					$"PlayMode command failed: {ex.Message}", "PLAYMODE_ERROR");
 			}
 		}

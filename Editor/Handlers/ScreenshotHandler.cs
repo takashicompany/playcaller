@@ -4,17 +4,17 @@ using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEditor;
-using PlayCaller.Editor.Models;
+using Playcaller.Editor.Models;
 
-namespace PlayCaller.Editor.Handlers
+namespace Playcaller.Editor.Handlers
 {
 	public static class ScreenshotHandler
 	{
 		static readonly string ScreenshotDir = Path.Combine(
-			Path.GetDirectoryName(Application.dataPath), "Temp", "PlayCaller", "Screenshots");
+			Path.GetDirectoryName(Application.dataPath), "Temp", "Playcaller", "Screenshots");
 		const string ScreenshotFileName = "screenshot.png";
 
-		/// <summary>PNG を Temp/PlayCaller/Screenshots/screenshot.png に保存し、絶対パスを返す。</summary>
+		/// <summary>PNG を Temp/Playcaller/Screenshots/screenshot.png に保存し、絶対パスを返す。</summary>
 		static string SaveToFile(byte[] imageBytes)
 		{
 			Directory.CreateDirectory(ScreenshotDir);
@@ -26,7 +26,7 @@ namespace PlayCaller.Editor.Handlers
 		/// <summary>スクリーンショット成功時のレスポンスを生成する。</summary>
 		static string MakeSuccessResponse(string commandId, string filePath, int width, int height)
 		{
-			return PlayCallerResponse.Success(commandId, new
+			return PlaycallerResponse.Success(commandId, new
 			{
 				filePath = filePath,
 				width = width,
@@ -41,7 +41,7 @@ namespace PlayCaller.Editor.Handlers
 		/// Screen Space Overlay の Canvas UI を含むゲーム画面全体をキャプチャする。
 		/// Play Mode 外では camera.Render() + RenderTexture 方式にフォールバックする。
 		/// </summary>
-		public static object Handle(PlayCallerCommand command)
+		public static object Handle(PlaycallerCommand command)
 		{
 			try
 			{
@@ -66,7 +66,7 @@ namespace PlayCaller.Editor.Handlers
 			}
 			catch (Exception ex)
 			{
-				return PlayCallerResponse.Error(command.Id,
+				return PlaycallerResponse.Error(command.Id,
 					$"Screenshot failed: {ex.Message}", "SCREENSHOT_ERROR");
 			}
 		}
@@ -74,7 +74,7 @@ namespace PlayCaller.Editor.Handlers
 		/// <summary>
 		/// Play Mode 中: ScreenCapture.CaptureScreenshotAsTexture() を使用。
 		/// WaitForEndOfFrame 後に呼び出す必要があるため、一時的な MonoBehaviour のコルーチンを使う。
-		/// Task<string> を返し、PlayCallerServer の ProcessCommandAsync で await される。
+		/// Task<string> を返し、PlaycallerClient の ProcessCommandAsync で await される。
 		/// </summary>
 		private static Task<string> CaptureWithScreenCapture(string commandId, int width, int height)
 		{
@@ -82,7 +82,7 @@ namespace PlayCaller.Editor.Handlers
 
 			// Play Mode 中なので MonoBehaviour コルーチンが使える
 			// 一時的な GameObject + MonoBehaviour を作成してコルーチンを実行
-			var helperGo = new GameObject("[PlayCaller_ScreenshotHelper]");
+			var helperGo = new GameObject("[Playcaller_ScreenshotHelper]");
 			helperGo.hideFlags = HideFlags.HideAndDontSave;
 			var helper = helperGo.AddComponent<ScreenshotCoroutineHelper>();
 
@@ -105,7 +105,7 @@ namespace PlayCaller.Editor.Handlers
 
 				if (screenshot == null)
 				{
-					tcs.TrySetResult(PlayCallerResponse.Error(commandId,
+					tcs.TrySetResult(PlaycallerResponse.Error(commandId,
 						"ScreenCapture.CaptureScreenshotAsTexture() returned null", "CAPTURE_ERROR"));
 					yield break;
 				}
@@ -135,7 +135,7 @@ namespace PlayCaller.Editor.Handlers
 
 				if (imageBytes == null || imageBytes.Length == 0)
 				{
-					tcs.TrySetResult(PlayCallerResponse.Error(commandId,
+					tcs.TrySetResult(PlaycallerResponse.Error(commandId,
 						"Failed to encode screenshot", "ENCODE_ERROR"));
 					yield break;
 				}
@@ -145,7 +145,7 @@ namespace PlayCaller.Editor.Handlers
 			}
 			catch (Exception ex)
 			{
-				tcs.TrySetResult(PlayCallerResponse.Error(commandId,
+				tcs.TrySetResult(PlaycallerResponse.Error(commandId,
 					$"Screenshot capture failed: {ex.Message}", "SCREENSHOT_ERROR"));
 			}
 			finally
@@ -174,7 +174,7 @@ namespace PlayCaller.Editor.Handlers
 
 			if (camera == null)
 			{
-				return PlayCallerResponse.Error(commandId,
+				return PlaycallerResponse.Error(commandId,
 					"No camera available for screenshot", "NO_CAMERA");
 			}
 
@@ -207,7 +207,7 @@ namespace PlayCaller.Editor.Handlers
 
 			if (imageBytes == null || imageBytes.Length == 0)
 			{
-				return PlayCallerResponse.Error(commandId,
+				return PlaycallerResponse.Error(commandId,
 					"Failed to encode screenshot", "ENCODE_ERROR");
 			}
 

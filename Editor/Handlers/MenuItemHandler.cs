@@ -1,12 +1,12 @@
 using System;
 using UnityEditor;
-using PlayCaller.Editor.Models;
+using Playcaller.Editor.Models;
 
-namespace PlayCaller.Editor.Handlers
+namespace Playcaller.Editor.Handlers
 {
 	public static class MenuItemHandler
 	{
-		public static string Handle(PlayCallerCommand command)
+		public static string Handle(PlaycallerCommand command)
 		{
 			try
 			{
@@ -14,7 +14,7 @@ namespace PlayCaller.Editor.Handlers
 
 				if (string.IsNullOrEmpty(menuPath))
 				{
-					return PlayCallerResponse.Error(command.Id,
+					return PlaycallerResponse.Error(command.Id,
 						"'menuPath' parameter is required.", "MISSING_PARAM");
 				}
 
@@ -22,7 +22,7 @@ namespace PlayCaller.Editor.Handlers
 
 				if (result)
 				{
-					return PlayCallerResponse.Success(command.Id, new
+					return PlaycallerResponse.Success(command.Id, new
 					{
 						executed = true,
 						menuPath = menuPath
@@ -30,13 +30,13 @@ namespace PlayCaller.Editor.Handlers
 				}
 				else
 				{
-					return PlayCallerResponse.Error(command.Id,
+					return PlaycallerResponse.Error(command.Id,
 						$"Menu item not found or failed: {menuPath}", "MENU_ITEM_FAILED");
 				}
 			}
 			catch (Exception ex)
 			{
-				return PlayCallerResponse.Error(command.Id,
+				return PlaycallerResponse.Error(command.Id,
 					$"Execute menu item failed: {ex.Message}", "MENU_ITEM_ERROR");
 			}
 		}

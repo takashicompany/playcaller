@@ -13,39 +13,37 @@ import json
 import os
 import struct
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncIterator
 
 from mcp.server.fastmcp import FastMCP
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-UNITY_HOST = "127.0.0.1"
-PORT_FILE_NAME = "PlayCaller.port"
+LISTEN_HOST = "127.0.0.1"
+PORT_FILE_NAME = "Playcaller.port"
 COMMAND_TIMEOUT_S = 30
-RECONNECT_DELAY_S = 2
-MAX_RECONNECT_DELAY_S = 30
 MAX_MESSAGE_SIZE = 1024 * 1024  # 1 MB
+UNITY_CONNECT_WAIT_S = 15  # send_command で Unity 接続を待つ最大秒数
 
 # ---------------------------------------------------------------------------
-# UnityConnection – asyncio TCP with 4-byte BE length-prefix framing
+# UnityServer – Python が TCP サーバー、Unity が接続してくる
 # ---------------------------------------------------------------------------
 
-class UnityConnection:
-    """Manages a TCP connection to the Unity Editor playcaller plugin."""
+class UnityServer:
+    """TCP server that Unity connects to."""
 
     def __init__(self) -> None:
+        self._server: asyncio.Server | None = None
         self._reader: asyncio.StreamReader | None = None
         self._writer: asyncio.StreamWriter | None = None
         self._connected = False
         self._command_id = 0
         self._pending: dict[str, asyncio.Future[Any]] = {}
         self._recv_task: asyncio.Task[None] | None = None
-        self._reconnect_task: asyncio.Task[None] | None = None
-        self._reconnect_attempts = 0
-        self._disconnecting = False
-        self._connect_lock = asyncio.Lock()
+        self._connection_event = asyncio.Event()
 
         # Last screenshot / screen dimensions for coordinate conversion
         self.last_screenshot_width = 0
@@ -59,51 +57,57 @@ class UnityConnection:
     def connected(self) -> bool:
         return self._connected
 
-    async def connect(self) -> None:
-        """Open the TCP connection (idempotent)."""
-        async with self._connect_lock:
-            if self._connected:
-                return
-            port = _read_port_from_file()
-            _log("Connecting to Unity at %s:%s ...", UNITY_HOST, port)
-            try:
-                self._reader, self._writer = await asyncio.wait_for(
-                    asyncio.open_connection(UNITY_HOST, port),
-                    timeout=10,
-                )
-            except Exception as exc:
-                raise ConnectionError(f"Unity connection failed: {exc}") from exc
-            self._connected = True
-            self._reconnect_attempts = 0
-            self._recv_task = asyncio.create_task(self._receive_loop())
-            _log("Connected to Unity at %s:%s", UNITY_HOST, port)
+    async def start(self) -> None:
+        """Start the TCP server and write port file."""
+        self._server = await asyncio.start_server(
+            self._handle_connection, LISTEN_HOST, 0
+        )
+        port = self._server.sockets[0].getsockname()[1]
+        _write_port_file(port)
+        _log("TCP server listening on %s:%d", LISTEN_HOST, port)
 
-    def disconnect(self) -> None:
-        """Tear down the connection synchronously (best-effort)."""
-        self._disconnecting = True
-        self._cancel_reconnect()
+    def stop(self) -> None:
+        """Stop the server and clean up."""
         if self._recv_task and not self._recv_task.done():
             self._recv_task.cancel()
         if self._writer:
-            self._writer.close()
+            try:
+                self._writer.close()
+            except Exception:
+                pass
+        if self._server:
+            self._server.close()
         self._reader = None
         self._writer = None
         self._connected = False
+        self._connection_event.clear()
         # Reject pending commands
         for fut in self._pending.values():
             if not fut.done():
-                fut.set_exception(ConnectionError("Disconnected"))
+                fut.set_exception(ConnectionError("Server stopped"))
         self._pending.clear()
-        self._disconnecting = False
+        _delete_port_file()
 
     async def send_command(self, cmd_type: str, params: dict[str, Any] | None = None) -> Any:
         """Send a command and wait for the matching response."""
         if not self._connected:
-            await self.connect()
+            # Unity 未接続 → 接続を待つ
+            _log("Unity not connected, waiting up to %ds...", UNITY_CONNECT_WAIT_S)
+            self._connection_event.clear()
+            try:
+                await asyncio.wait_for(
+                    self._connection_event.wait(), timeout=UNITY_CONNECT_WAIT_S
+                )
+            except asyncio.TimeoutError:
+                raise ConnectionError(
+                    f"Unity not connected (waited {UNITY_CONNECT_WAIT_S}s)"
+                )
 
         self._command_id += 1
         cmd_id = str(self._command_id)
-        payload = json.dumps({"id": cmd_id, "type": cmd_type, "params": params or {}}).encode()
+        payload = json.dumps(
+            {"id": cmd_id, "type": cmd_type, "params": params or {}}
+        ).encode()
 
         frame = struct.pack(">I", len(payload)) + payload
 
@@ -119,21 +123,70 @@ class UnityConnection:
             return await asyncio.wait_for(fut, timeout=COMMAND_TIMEOUT_S)
         except asyncio.TimeoutError:
             self._pending.pop(cmd_id, None)
-            # Connection is likely dead — tear down and schedule reconnect
-            _log("Command %s timed out, marking connection as dead", cmd_type)
-            self._connected = False
-            if self._recv_task and not self._recv_task.done():
-                self._recv_task.cancel()
-            if self._writer:
+            raise TimeoutError(
+                f"Command {cmd_type} timed out after {COMMAND_TIMEOUT_S}s"
+            )
+
+    async def wait_for_reconnect(self, timeout_s: float) -> bool:
+        """Wait for Unity to (re)connect after domain reload."""
+        # まず切断を待つ（短い猶予）
+        if self._connected:
+            try:
+                await asyncio.wait_for(self._wait_for_disconnect(), timeout=3)
+            except asyncio.TimeoutError:
+                # まだ接続中 = リロードが発生しなかった可能性
+                pass
+
+        if self._connected:
+            # 切断されなかった → まだ繋がっている → OK
+            return True
+
+        # Unity の再接続を待つ
+        self._connection_event.clear()
+        try:
+            await asyncio.wait_for(
+                self._connection_event.wait(), timeout=timeout_s
+            )
+            # 再接続後に ping で確認
+            await self.send_command("ping")
+            return True
+        except (asyncio.TimeoutError, Exception):
+            return self._connected
+
+    # -- connection handling -------------------------------------------------
+
+    async def _handle_connection(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        """Handle a new connection from Unity."""
+        peer = writer.get_extra_info("peername")
+        _log("Unity connected from %s", peer)
+
+        # 既存接続があれば切断（1接続のみ許可）
+        if self._writer:
+            try:
                 self._writer.close()
-            self._reader = None
-            self._writer = None
-            for f in self._pending.values():
-                if not f.done():
-                    f.set_exception(ConnectionError("Connection reset after timeout"))
-            self._pending.clear()
-            self._schedule_reconnect()
-            raise TimeoutError(f"Command {cmd_type} timed out after {COMMAND_TIMEOUT_S}s")
+            except Exception:
+                pass
+        if self._recv_task and not self._recv_task.done():
+            self._recv_task.cancel()
+            try:
+                await self._recv_task
+            except (asyncio.CancelledError, Exception):
+                pass
+
+        # 既存の pending をリジェクト（古いセッションの残り）
+        for fut in self._pending.values():
+            if not fut.done():
+                fut.set_exception(ConnectionError("New connection replaced old"))
+        self._pending.clear()
+
+        self._reader = reader
+        self._writer = writer
+        self._connected = True
+        self._connection_event.set()
+
+        self._recv_task = asyncio.create_task(self._receive_loop())
 
     # -- receive loop -------------------------------------------------------
 
@@ -161,7 +214,11 @@ class UnityConnection:
             self._on_disconnected()
 
     def _process_response(self, response: dict[str, Any]) -> None:
-        resp_id = str(response.get("id", "")) if response.get("id") is not None else None
+        resp_id = (
+            str(response.get("id", ""))
+            if response.get("id") is not None
+            else None
+        )
 
         # Match by ID, or fall back to first pending command
         target_id = None
@@ -181,51 +238,37 @@ class UnityConnection:
         if status == "success":
             fut.set_result(response.get("result", {}))
         elif status == "error":
-            fut.set_exception(RuntimeError(response.get("error", "Command failed")))
+            fut.set_exception(
+                RuntimeError(response.get("error", "Command failed"))
+            )
         else:
             fut.set_result(response)
 
-    # -- reconnection -------------------------------------------------------
+    # -- disconnect handling ------------------------------------------------
 
     def _on_disconnected(self) -> None:
-        if self._disconnecting:
-            return
-        _log("Disconnected from Unity")
+        _log("Unity disconnected")
+        was_connected = self._connected
         self._connected = False
+        self._connection_event.clear()
         if self._writer:
-            self._writer.close()
+            try:
+                self._writer.close()
+            except Exception:
+                pass
         self._reader = None
         self._writer = None
         # Reject pending commands
-        for fut in self._pending.values():
-            if not fut.done():
-                fut.set_exception(ConnectionError("Connection closed"))
-        self._pending.clear()
-        if not self._disconnecting:
-            self._schedule_reconnect()
+        if was_connected:
+            for fut in self._pending.values():
+                if not fut.done():
+                    fut.set_exception(ConnectionError("Connection closed"))
+            self._pending.clear()
 
-    def _cancel_reconnect(self) -> None:
-        if self._reconnect_task and not self._reconnect_task.done():
-            self._reconnect_task.cancel()
-            self._reconnect_task = None
-
-    def _schedule_reconnect(self) -> None:
-        if self._reconnect_task and not self._reconnect_task.done():
-            return
-        delay = min(RECONNECT_DELAY_S * (2 ** self._reconnect_attempts), MAX_RECONNECT_DELAY_S)
-        _log("Scheduling reconnection in %.1fs (attempt %d)", delay, self._reconnect_attempts + 1)
-        self._reconnect_task = asyncio.create_task(self._reconnect_after(delay))
-
-    async def _reconnect_after(self, delay: float) -> None:
-        await asyncio.sleep(delay)
-        self._reconnect_attempts += 1
-        try:
-            await self.connect()
-        except Exception as exc:
-            _log("Reconnection failed: %s", exc)
-            if not self._disconnecting:
-                self._reconnect_task = None
-                self._schedule_reconnect()
+    async def _wait_for_disconnect(self) -> None:
+        """Wait until the connection drops."""
+        while self._connected:
+            await asyncio.sleep(0.1)
 
 
 # ---------------------------------------------------------------------------
@@ -236,58 +279,54 @@ def _log(fmt: str, *args: object) -> None:
     print(f"[playcaller] {fmt % args}", file=sys.stderr, flush=True)
 
 
-def _read_port_from_file() -> int:
-    """Read the Unity TCP port from the port file written by PlayCallerServer."""
+def _get_port_file_path() -> Path:
     project_dir = os.environ.get("UNITY_PROJECT_DIR")
     if not project_dir:
         raise RuntimeError(
             "UNITY_PROJECT_DIR environment variable is not set. "
             "Set it to the Unity project root directory."
         )
-    port_file = Path(project_dir) / "Temp" / PORT_FILE_NAME
-    if not port_file.exists():
-        raise FileNotFoundError(
-            f"Port file not found: {port_file}. "
-            "Is the Unity Editor running with PlayCaller?"
-        )
-    text = port_file.read_text().strip()
+    return Path(project_dir) / "Temp" / PORT_FILE_NAME
+
+
+def _write_port_file(port: int) -> None:
+    """Write the TCP server port to the port file (Unity reads this)."""
+    path = _get_port_file_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(str(port))
+    _log("Port file written: %s (port %d)", path, port)
+
+
+def _delete_port_file() -> None:
+    """Delete the port file on server shutdown."""
     try:
-        return int(text)
-    except ValueError:
-        raise ValueError(f"Invalid port number in {port_file}: {text!r}")
-
-
-async def _wait_for_reconnect(unity: UnityConnection, timeout_s: float) -> bool:
-    """Poll until Unity reconnects after domain reload."""
-    await asyncio.sleep(1)  # wait for disconnect to happen
-    deadline = asyncio.get_event_loop().time() + timeout_s
-    while asyncio.get_event_loop().time() < deadline:
-        if unity.connected:
-            try:
-                await unity.send_command("ping")
-                return True
-            except Exception:
-                pass
-        else:
-            try:
-                await unity.connect()
-                try:
-                    await unity.send_command("ping")
-                    return True
-                except Exception:
-                    pass
-            except Exception:
-                pass
-        await asyncio.sleep(0.5)
-    return False
+        path = _get_port_file_path()
+        if path.exists():
+            path.unlink()
+            _log("Port file deleted: %s", path)
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
 # FastMCP application
 # ---------------------------------------------------------------------------
 
-mcp = FastMCP("playcaller")
-unity = UnityConnection()
+unity = UnityServer()
+
+
+@asynccontextmanager
+async def server_lifespan(app: FastMCP) -> AsyncIterator[None]:
+    """Start TCP server on startup, clean up on shutdown."""
+    await unity.start()
+    try:
+        yield None
+    finally:
+        unity.stop()
+
+
+mcp = FastMCP("playcaller", lifespan=server_lifespan)
+
 
 # -- screenshot -------------------------------------------------------------
 
@@ -417,7 +456,7 @@ async def playcaller_playmode(action: str) -> str:
         text = json.dumps(result, indent=2)
 
         if action in ("play", "stop"):
-            reconnected = await _wait_for_reconnect(unity, 15)
+            reconnected = await unity.wait_for_reconnect(15)
             if not reconnected:
                 return (
                     text + "\n\nWarning: Unity domain reload completed but TCP reconnection timed out. "
@@ -427,7 +466,7 @@ async def playcaller_playmode(action: str) -> str:
     except Exception as exc:
         if action in ("play", "stop"):
             _log("%s command got error (expected during domain reload): %s", action, exc)
-            reconnected = await _wait_for_reconnect(unity, 15)
+            reconnected = await unity.wait_for_reconnect(15)
             if reconnected:
                 return f"Play Mode {'started' if action == 'play' else 'stopped'} (reconnected after domain reload)"
             return f"Play Mode {action} sent but reconnection failed after domain reload. Unity may still be reloading."
@@ -496,7 +535,7 @@ async def playcaller_refresh() -> str:
     except Exception as exc:
         # Connection lost during refresh likely means domain reload started
         _log("Refresh command error (possible domain reload): %s", exc)
-        reconnected = await _wait_for_reconnect(unity, 30)
+        reconnected = await unity.wait_for_reconnect(30)
         if reconnected:
             return "AssetDatabase refreshed (domain reload completed, reconnected)."
         return "AssetDatabase refresh triggered domain reload but reconnection timed out. Unity may still be compiling."
@@ -504,7 +543,7 @@ async def playcaller_refresh() -> str:
     if result.get("isCompiling"):
         # Compilation started — domain reload will follow, connection will drop
         _log("Refresh triggered compilation, waiting for domain reload...")
-        reconnected = await _wait_for_reconnect(unity, 30)
+        reconnected = await unity.wait_for_reconnect(30)
         if reconnected:
             return "AssetDatabase refreshed (compilation and domain reload completed)."
         return "AssetDatabase refreshed but compilation/domain reload timed out. Unity may still be compiling."
