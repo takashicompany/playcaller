@@ -444,26 +444,50 @@ namespace Playcaller.Editor.Handlers
 
 		private static GameObject FindPhysics2DTargetAtPosition(Vector2 unityScreenPos)
 		{
-			var camera = Camera.main;
-			if (camera == null) return null;
+			// マルチカメラ対応: スクリーン座標がどのカメラの viewport 内かを判定し、
+			// 適切なカメラで world 変換 → そのカメラの culling mask でレイヤーフィルタ
+			var allCameras = Camera.allCameras;
+			// depth 降順でソート (手前のカメラから優先)
+			System.Array.Sort(allCameras, (a, b) => b.depth.CompareTo(a.depth));
 
-			Vector2 worldPos = camera.ScreenToWorldPoint(unityScreenPos);
-			var hit = Physics2D.Raycast(worldPos, Vector2.zero);
+			foreach (var cam in allCameras)
+			{
+				if (cam == null || !cam.isActiveAndEnabled) continue;
+				// Depth only clear のカメラ (FlyCamera) はスキップ
+				if (cam.clearFlags == CameraClearFlags.Depth) continue;
 
-			if (hit.collider != null)
-				return hit.collider.gameObject;
+				Rect vpPixel = cam.pixelRect;
+				if (!vpPixel.Contains(unityScreenPos)) continue;
+
+				Vector2 worldPos = cam.ScreenToWorldPoint(unityScreenPos);
+				int layerMask = cam.cullingMask;
+				var hit = Physics2D.Raycast(worldPos, Vector2.zero, Mathf.Infinity, layerMask);
+
+				if (hit.collider != null)
+					return hit.collider.gameObject;
+			}
 
 			return null;
 		}
 
 		private static GameObject FindPhysics3DTargetAtPosition(Vector2 unityScreenPos)
 		{
-			var camera = Camera.main;
-			if (camera == null) return null;
+			var allCameras = Camera.allCameras;
+			System.Array.Sort(allCameras, (a, b) => b.depth.CompareTo(a.depth));
 
-			Ray ray = camera.ScreenPointToRay(unityScreenPos);
-			if (Physics.Raycast(ray, out RaycastHit hit))
-				return hit.collider.gameObject;
+			foreach (var cam in allCameras)
+			{
+				if (cam == null || !cam.isActiveAndEnabled) continue;
+				if (cam.clearFlags == CameraClearFlags.Depth) continue;
+
+				Rect vpPixel = cam.pixelRect;
+				if (!vpPixel.Contains(unityScreenPos)) continue;
+
+				int layerMask = cam.cullingMask;
+				Ray ray = cam.ScreenPointToRay(unityScreenPos);
+				if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, layerMask))
+					return hit.collider.gameObject;
+			}
 
 			return null;
 		}
