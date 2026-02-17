@@ -63,6 +63,9 @@ namespace Playcaller.Editor
 				case "get_editor_state":
 					return EditorStateHandler.Handle(command);
 
+				case "key_press":
+					return KeyInputHandler.Handle(command);
+
 				default:
 					return PlaycallerResponse.Error(command.Id,
 						$"Unknown command type: {command.Type}", "UNKNOWN_COMMAND");

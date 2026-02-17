@@ -613,6 +613,24 @@ async def playcaller_execute_menu_item(menuPath: str) -> str:
         return f"Execute menu item failed: {exc}"
 
 
+# -- key_press --------------------------------------------------------------
+
+@mcp.tool()
+async def playcaller_key_press(key: str) -> str:
+    """Press a key on the keyboard.
+
+    key: Unity KeyCode name (e.g. "LeftArrow", "RightArrow", "Space", "Return", "A", "B").
+    See Unity KeyCode enum for all valid values.
+    """
+    try:
+        result = await unity.send_command("key_press", {"key": key})
+        if result.get("enqueued"):
+            return f'Key pressed: {result.get("key")}'
+        return f"Key press result: {json.dumps(result)}"
+    except Exception as exc:
+        return f"Key press failed: {exc}"
+
+
 # -- get_editor_state -------------------------------------------------------
 
 @mcp.tool()
