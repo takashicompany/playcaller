@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using UnityEditor;
-using UnityEditor.PackageManager;
+using PackageInfo = UnityEditor.PackageManager.PackageInfo;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
