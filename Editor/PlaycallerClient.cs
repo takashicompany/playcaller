@@ -51,7 +51,10 @@ namespace Playcaller.Editor
 
 		static PlaycallerClient()
 		{
-			Debug.Log("[Playcaller] Initializing...");
+			if (ReadPortFile() > 0)
+				Debug.Log("[Playcaller] MCP サーバーを検出しました。接続しています...");
+			else
+				Debug.Log("[Playcaller] MCP サーバーが見つかりません。Claude Code で playcaller MCP を設定してください。");
 			EditorApplication.update += Update;
 			EditorApplication.quitting += OnQuitting;
 			AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
