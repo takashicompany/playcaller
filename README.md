@@ -1,29 +1,13 @@
 # Playcaller
 
-Unity Editor 上で動作するゲームに対して、座標ベースの入力シミュレーション（タップ・ドラッグ・フリック）を行う MCP サーバーです。
+AIがUnity向けに行った実装を、AI自身が確認できるようにするMCPサーバーです。
+座標ベースの入力シミュレーション（タップ・ドラッグ・フリック)を用いて、AIが実際のプレイヤーと近しい入力できるようになります。
+大まかに言うならUnity版のPlaywright MCPです。
 
-AI エージェントが Unity の Game View を「実際のプレイヤーのように」操作し、スクリーンショットで結果を確認できます。Web ブラウザにおける Playwright に相当する役割を Unity Editor で担います。
-
-## アーキテクチャ
-
-```
-Claude Code (MCP Client)
-    │  stdio
-    ▼
-Python MCP Server (Server~/)  ← TCP サーバーも兼ねる
-    ▲  TCP 127.0.0.1:<OS割当ポート>
-    │
-Unity Editor (Editor/)
-    PlaycallerClient ([InitializeOnLoad])
-    │
-    ▼
-Game View (EventSystem / Physics Raycast)
-```
-
-- **Python MCP + TCP サーバー** (`Server~/`): MCP プロトコル (stdio) でクライアントと通信。TCP サーバーとしてリッスンし、Unity からの接続を受け入れる
-- **Unity C# エディタスクリプト** (`Editor/`): TCP クライアントとして Python サーバーに接続。ドメインリロード後に `[InitializeOnLoad]` で自動再接続
-- **TCP プロトコル**: big-endian 4-byte length-prefix framing + JSON
-- **ポートファイル**: Python がポートファイル (`Temp/Playcaller.port`) を書き込み、Unity が読み取る
+## 苦手なことの例
+- アクション性の高いゲームの動作確認
+- ゲーム体験の総合的な確認
+- 視覚的な演出の評価
 
 ## セットアップ
 
