@@ -1,162 +1,68 @@
 # Playcaller
 
-AIがUnity向けに行った実装を、AI自身が確認できるようにするMCPサーバーです。
-座標ベースの入力シミュレーション（タップ・ドラッグ・フリック)を用いて、AIが実際のプレイヤーと近しい入力できるようになります。
-大まかに言うならUnity版のPlaywright MCPです。
+AIがUnity上で動作するゲームを、実際のプレイヤーのように操作・確認できるMCPサーバーです。
+スクリーンショットの取得、タップ・ドラッグ・フリックなどの入力シミュレーション、Play Modeの制御などをAIエージェントから行えます。
 
-## 苦手なことの例
+大まかに言うなら **Unity版の [Playwright MCP](https://github.com/anthropics/anthropic-quickstarts/tree/main/mcp-playwright)** です。
+
+## できること
+
+- Game View のスクリーンショット取得
+- タップ・ドラッグ・フリック・キー入力のシミュレーション
+- Play Mode の開始・停止・一時停止
+- シーン内の GameObject 階層の取得・詳細確認
+- コンソールログの取得
+- AssetDatabase のリフレッシュ
+- メニューアイテムの実行
+- エディタの状態取得
+
+## 苦手なこと
+
 - アクション性の高いゲームの動作確認
 - ゲーム体験の総合的な確認
 - 視覚的な演出の評価
 
-## セットアップ
-
-### 要件
+## 要件
 
 - Unity 2022.3 以上
-- Python 3.10 以上（`uv` / `uvx` 推奨）
-- Newtonsoft.Json（Unity 側で使用。UPM `com.unity.nuget.newtonsoft-json` など）
+- Python 3.10 以上（[uv](https://docs.astral.sh/uv/) 推奨）
 
-### インストール
+## 導入手順
 
-#### UPM パッケージとして（推奨）
+### 1. Unity パッケージのインストール
 
-`Packages/manifest.json` に追加:
+Unity Editor で **Window > Package Manager** を開き、左上の **+** ボタンから **Add package from git URL...** を選択して、以下の URL を入力してください。
 
-```json
-{
-  "dependencies": {
-    "com.takashicompany.playcaller": "git@github.com:takashicompany/playcaller.git"
-  }
-}
+```
+https://github.com/takashicompany/playcaller.git
 ```
 
-### MCP クライアント設定
+### 2. MCP サーバーの登録
 
-`.mcp.json` に追加:
+Unity Editor のメニューバーから **Playcaller > 初期設定の実行** を選択してください。Claude Code に MCP サーバーが自動登録されます。
 
-```json
-{
-  "mcpServers": {
-    "playcaller": {
-      "command": "uvx",
-      "args": ["--from", "mcp[cli]>=1.2.0", "mcp", "run", "<playcallerへのパス>/Server~/server.py"],
-      "env": {
-        "UNITY_PROJECT_DIR": "<Unityプロジェクトルートへのパス>"
-      }
-    }
-  }
-}
-```
+### 3. 動作確認
+
+Unity Editor を開いた状態で Claude Code を起動すると、自動的に接続されます。
 
 ## MCP ツール一覧
 
-### playcaller_screenshot
+| ツール名 | 説明 |
+|---|---|
+| `playcaller_screenshot` | Game View のスクリーンショットを取得 |
+| `playcaller_tap` | 指定座標をタップ |
+| `playcaller_drag` | ドラッグ操作 |
+| `playcaller_flick` | フリック（クイックスワイプ）操作 |
+| `playcaller_key_press` | キーボード入力 |
+| `playcaller_playmode` | Play Mode の開始・停止・一時停止 |
+| `playcaller_wait` | 指定時間またはフレーム数の待機 |
+| `playcaller_console_log` | Unity コンソールログの取得 |
+| `playcaller_refresh` | AssetDatabase のリフレッシュ |
+| `playcaller_get_hierarchy` | シーン内の GameObject 階層を取得 |
+| `playcaller_get_gameobject` | 特定の GameObject の詳細情報を取得 |
+| `playcaller_execute_menu_item` | Unity Editor のメニューアイテムを実行 |
+| `playcaller_get_editor_state` | エディタの現在の状態を取得 |
 
-Game View のスクリーンショットを取得します。
+## ライセンス
 
-| パラメータ | 型 | デフォルト | 説明 |
-|---|---|---|---|
-| `width` | number | 0 (リサイズなし) | リサイズ後の幅 |
-| `height` | number | 0 (リサイズなし) | リサイズ後の高さ |
-
-**戻り値**: base64 PNG 画像 + メタデータ (`width`, `height`, `screenWidth`, `screenHeight`)
-
-- Play Mode 中: `ScreenCapture.CaptureScreenshotAsTexture()` で UI を含むキャプチャ
-- Play Mode 外: `Camera.Render()` + RenderTexture によるフォールバック
-
-### playcaller_tap
-
-スクリーンショット座標でタップを実行します。
-
-| パラメータ | 型 | デフォルト | 説明 |
-|---|---|---|---|
-| `x` | number | (必須) | 左端からのピクセル数 |
-| `y` | number | (必須) | 上端からのピクセル数 |
-| `holdDurationMs` | number | 0 | 長押し時間 (最大 10000) |
-
-**イベント順序**: pointerEnter → pointerDown → (hold) → pointerUp → pointerClick → pointerExit
-
-**ターゲット判定の優先順位**:
-1. UI (GraphicRaycaster)
-2. 2D Physics (Physics2D.Raycast)
-3. 3D Physics (Physics.Raycast)
-
-### playcaller_drag
-
-ある座標から別の座標へドラッグを実行します。
-
-| パラメータ | 型 | デフォルト | 説明 |
-|---|---|---|---|
-| `fromX` | number | (必須) | 開始 X |
-| `fromY` | number | (必須) | 開始 Y |
-| `toX` | number | (必須) | 終了 X |
-| `toY` | number | (必須) | 終了 Y |
-| `durationMs` | number | 300 | ドラッグ時間 (最大 10000) |
-| `steps` | number | 10 | 中間ポイント数 (2-100) |
-
-**イベント順序**: pointerDown → beginDrag → drag (複数回) → endDrag → pointerUp
-
-### playcaller_flick
-
-フリック（クイックスワイプ）を実行します。
-
-| パラメータ | 型 | デフォルト | 説明 |
-|---|---|---|---|
-| `fromX` | number | (必須) | 開始 X |
-| `fromY` | number | (必須) | 開始 Y |
-| `dx` | number | (必須) | 水平オフセット (正=右) |
-| `dy` | number | (必須) | 垂直オフセット (正=下) |
-| `durationMs` | number | 150 | フリック時間 (最大 5000) |
-
-### playcaller_playmode
-
-Unity Play Mode を制御します。
-
-| パラメータ | 型 | 説明 |
-|---|---|---|
-| `action` | enum | `play` / `pause` / `stop` / `get_state` |
-
-**Play Mode 切り替え時の動作**: play/stop はドメインリロードを引き起こし TCP が切断されます。Unity 側が `[InitializeOnLoad]` で自動再接続し、Python サーバーは最大 15 秒間 Unity の再接続を待ってからレスポンスを返します。
-
-### playcaller_wait
-
-指定期間の待機を行います。
-
-| パラメータ | 型 | デフォルト | 説明 |
-|---|---|---|---|
-| `ms` | number | - | ミリ秒 (最大 30000) |
-| `frames` | number | - | フレーム数 (最大 600) |
-
-両方指定した場合は `frames` が優先されます。
-
-### playcaller_console_log
-
-Unity コンソールログを取得します。
-
-| パラメータ | 型 | デフォルト | 説明 |
-|---|---|---|---|
-| `count` | number | 50 | 取得件数 (最大 200) |
-| `level` | enum | `all` | `all` / `log` / `warning` / `error` |
-| `clear` | boolean | false | 取得後にクリアするか |
-
-メモリ上に最大 1000 件のログを保持します。
-
-## 座標系
-
-全ての入力座標は **スクリーンショット画像の座標系** を使用します:
-
-- **原点**: 左上
-- **X 軸**: 右方向が正
-- **Y 軸**: 下方向が正
-
-内部でスクリーンショット解像度と Game View 解像度の比率からスケーリング変換し、Unity の画面座標（左下原点、Y 上向き）に変換します。
-
-```
-スクリーンショット座標 (x, y)
-  ↓ scaleX = screenWidth / screenshotWidth
-  ↓ scaleY = screenHeight / screenshotHeight
-Unity 座標 (x * scaleX, screenHeight - y * scaleY)
-```
-
-
+MIT License
