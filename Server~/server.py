@@ -401,6 +401,43 @@ async def playcaller_tap(x: int, y: int, holdDurationMs: int = 0) -> str:
         return f"Tap failed: {exc}"
 
 
+# -- multi_tap --------------------------------------------------------------
+
+@mcp.tool()
+async def playcaller_multi_tap(
+    taps: list[dict],
+    intervalMs: int = 50,
+) -> str:
+    """Execute multiple taps in rapid succession within a single MCP call.
+
+    taps: list of {x, y} coordinate pairs (screenshot coordinates).
+    intervalMs: delay between taps in milliseconds (default 50, 0-1000).
+    """
+    intervalMs = max(0, min(1000, intervalMs))
+    results: list[str] = []
+    for i, tap in enumerate(taps):
+        x = tap.get("x", 0)
+        y = tap.get("y", 0)
+        hold = tap.get("holdDurationMs", 0)
+        try:
+            result = await unity.send_command("tap", {
+                "x": x, "y": y, "holdDurationMs": hold,
+                "screenshotWidth": unity.last_screenshot_width,
+                "screenshotHeight": unity.last_screenshot_height,
+                "screenWidth": unity.last_screen_width,
+                "screenHeight": unity.last_screen_height,
+            })
+            if result.get("tapped"):
+                results.append(f'[{i}] Tapped "{result.get("targetName")}" at ({x}, {y})')
+            else:
+                results.append(f"[{i}] Tap at ({x}, {y}) - no target hit")
+        except Exception as exc:
+            results.append(f"[{i}] Tap at ({x}, {y}) failed: {exc}")
+        if intervalMs > 0 and i < len(taps) - 1:
+            await asyncio.sleep(intervalMs / 1000.0)
+    return "\n".join(results)
+
+
 # -- drag -------------------------------------------------------------------
 
 @mcp.tool()
