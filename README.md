@@ -48,12 +48,29 @@ claude mcp add playcaller -- sh -c "uvx --from 'mcp[cli]>=1.2.0' mcp run Library
 <details>
 <summary>Claude Code の作業ディレクトリが Unity プロジェクトと異なる場合</summary>
 
-`UNITY_PROJECT_DIR` に Unity プロジェクトのパスを指定し、server.py のパスもそこからの絶対パスにしてください。
+`--env UNITY_PROJECT_DIR` で Unity プロジェクトのパスを指定してください。
 
 ```sh
 claude mcp add playcaller \
   --env UNITY_PROJECT_DIR=<Unityプロジェクトのパス> \
-  -- sh -c "uvx --from 'mcp[cli]>=1.2.0' mcp run <Unityプロジェクトのパス>/Library/PackageCache/com.takashicompany.playcaller@*/Server~/server.py"
+  -- sh -c 'uvx --from "mcp[cli]>=1.2.0" mcp run "$UNITY_PROJECT_DIR/Library/PackageCache/com.takashicompany.playcaller@*/Server~/server.py"'
+```
+
+例えば、以下のようなディレクトリ構成で `my-repo/` から Claude Code を使う場合:
+
+```
+my-repo/          ← Claude Code の作業ディレクトリ
+├── my-unity/     ← Unity プロジェクト
+│   ├── Assets/
+│   ├── Library/
+│   └── Packages/
+└── docs/
+```
+
+```sh
+claude mcp add playcaller \
+  --env UNITY_PROJECT_DIR=./my-unity \
+  -- sh -c 'uvx --from "mcp[cli]>=1.2.0" mcp run "$UNITY_PROJECT_DIR/Library/PackageCache/com.takashicompany.playcaller@*/Server~/server.py"'
 ```
 
 </details>
@@ -80,6 +97,3 @@ Unity Editor を開いた状態で Claude Code を起動すると、自動的に
 | `playcaller_execute_menu_item` | Unity Editor のメニューアイテムを実行 |
 | `playcaller_get_editor_state` | エディタの現在の状態を取得 |
 
-## ライセンス
-
-MIT License
