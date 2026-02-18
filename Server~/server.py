@@ -279,14 +279,33 @@ def _log(fmt: str, *args: object) -> None:
     print(f"[playcaller] {fmt % args}", file=sys.stderr, flush=True)
 
 
+def _find_unity_project_dir() -> Path:
+    """Detect the Unity project root directory.
+
+    1. UNITY_PROJECT_DIR environment variable (if set)
+    2. Walk up from CWD looking for a directory containing both Assets/ and Packages/
+    """
+    env_dir = os.environ.get("UNITY_PROJECT_DIR")
+    if env_dir:
+        p = Path(env_dir).resolve()
+        if (p / "Assets").is_dir() and (p / "Packages").is_dir():
+            return p
+        _log("UNITY_PROJECT_DIR=%s does not look like a Unity project, ignoring", env_dir)
+
+    cur = Path.cwd().resolve()
+    for d in [cur, *cur.parents]:
+        if (d / "Assets").is_dir() and (d / "Packages").is_dir():
+            _log("Auto-detected Unity project: %s", d)
+            return d
+
+    raise RuntimeError(
+        "Could not find Unity project directory. "
+        "Run from within the Unity project tree, or set UNITY_PROJECT_DIR."
+    )
+
+
 def _get_port_file_path() -> Path:
-    project_dir = os.environ.get("UNITY_PROJECT_DIR")
-    if not project_dir:
-        raise RuntimeError(
-            "UNITY_PROJECT_DIR environment variable is not set. "
-            "Set it to the Unity project root directory."
-        )
-    return Path(project_dir) / "Temp" / PORT_FILE_NAME
+    return _find_unity_project_dir() / "Temp" / PORT_FILE_NAME
 
 
 def _write_port_file(port: int) -> None:
