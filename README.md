@@ -39,7 +39,24 @@ https://github.com/takashicompany/playcaller.git
 
 ### 2. MCP サーバーの登録
 
-Unity Editor のメニューバーから **Playcaller > 初期設定の実行** を選択してください。Claude Code に MCP サーバーが自動登録されます。
+Unity プロジェクトのルートで以下を実行してください。
+
+```sh
+claude mcp add playcaller -- sh -c "uvx --from 'mcp[cli]>=1.2.0' mcp run Library/PackageCache/com.takashicompany.playcaller@*/Server~/server.py"
+```
+
+<details>
+<summary>Claude Code の作業ディレクトリが Unity プロジェクトと異なる場合</summary>
+
+`UNITY_PROJECT_DIR` に Unity プロジェクトのパスを指定し、server.py のパスもそこからの絶対パスにしてください。
+
+```sh
+claude mcp add playcaller \
+  --env UNITY_PROJECT_DIR=<Unityプロジェクトのパス> \
+  -- sh -c "uvx --from 'mcp[cli]>=1.2.0' mcp run <Unityプロジェクトのパス>/Library/PackageCache/com.takashicompany.playcaller@*/Server~/server.py"
+```
+
+</details>
 
 ### 3. 動作確認
 
