@@ -34,7 +34,7 @@ namespace Playcaller.Editor
 		private static string GetPortFilePath()
 		{
 			var projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
-			return System.IO.Path.Combine(projectRoot, "Temp", PortFileName);
+			return System.IO.Path.Combine(projectRoot, "Library", "Playcaller", PortFileName);
 		}
 
 		private static int ReadPortFile()
