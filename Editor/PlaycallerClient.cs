@@ -66,6 +66,14 @@ namespace Playcaller.Editor
 		{
 			ProcessCommandQueue();
 
+			// ReceiveLoop が終了していれば接続が切れている → クリーンアップ
+			if (_receiveTask != null && _receiveTask.IsCompleted)
+			{
+				CleanupConnection();
+				_receiveTask = null;
+				_cts = null;
+			}
+
 			if (_client == null || !_client.Connected)
 			{
 				TryReconnect();

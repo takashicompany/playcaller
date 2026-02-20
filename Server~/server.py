@@ -687,6 +687,27 @@ async def playcaller_key_press(key: str) -> str:
         return f"Key press failed: {exc}"
 
 
+# -- game_query -------------------------------------------------------------
+
+@mcp.tool()
+async def playcaller_game_query(queryType: str = "") -> str:
+    """Ask the game what actions are currently available.
+
+    The game responds with available operations, screen coordinates, and expected outcomes.
+    If the game has not implemented query support, an error message is returned.
+
+    queryType: optional query type hint (default: general query).
+    """
+    try:
+        result = await unity.send_command("game_query", {"queryType": queryType})
+        # If result contains a "text" field, return it directly for readability
+        if isinstance(result, dict) and "text" in result:
+            return result["text"]
+        return json.dumps(result, indent=2, ensure_ascii=False)
+    except Exception as exc:
+        return f"Game query failed: {exc}"
+
+
 # -- get_editor_state -------------------------------------------------------
 
 @mcp.tool()
