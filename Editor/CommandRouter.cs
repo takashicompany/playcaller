@@ -66,6 +66,12 @@ namespace Playcaller.Editor
 				case "key_press":
 					return KeyInputHandler.Handle(command);
 
+				case "game_query":
+					return GameQueryHandler.Handle(command);
+
+				case "set_game_view_size":
+					return GameViewHandler.Handle(command);
+
 				default:
 					return PlaycallerResponse.Error(command.Id,
 						$"Unknown command type: {command.Type}", "UNKNOWN_COMMAND");

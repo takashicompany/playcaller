@@ -13,12 +13,23 @@ namespace Playcaller.Editor.Handlers
 		static readonly string ScreenshotDir = Path.Combine(
 			Path.GetDirectoryName(Application.dataPath), "Temp", "Playcaller", "Screenshots");
 		const string ScreenshotFileName = "screenshot.png";
+		static readonly string ProjectRoot = Path.GetDirectoryName(Application.dataPath);
 
-		/// <summary>PNG を Temp/Playcaller/Screenshots/screenshot.png に保存し、絶対パスを返す。</summary>
-		static string SaveToFile(byte[] imageBytes)
+		/// <summary>PNG をファイルに保存し、絶対パスを返す。</summary>
+		static string SaveToFile(byte[] imageBytes, string filename)
 		{
-			Directory.CreateDirectory(ScreenshotDir);
-			string filePath = Path.Combine(ScreenshotDir, ScreenshotFileName);
+			string filePath;
+			if (!string.IsNullOrEmpty(filename))
+			{
+				// filename が指定されていればそのパスに保存
+				filePath = Path.IsPathRooted(filename) ? filename : Path.Combine(ProjectRoot, filename);
+			}
+			else
+			{
+				filePath = Path.Combine(ScreenshotDir, ScreenshotFileName);
+			}
+
+			Directory.CreateDirectory(Path.GetDirectoryName(filePath));
 			File.WriteAllBytes(filePath, imageBytes);
 			return filePath;
 		}
@@ -47,21 +58,23 @@ namespace Playcaller.Editor.Handlers
 			{
 				int width = 0;
 				int height = 0;
+				string filename = null;
 
 				if (command.Params != null)
 				{
 					width = command.Params["width"]?.ToObject<int>() ?? 0;
 					height = command.Params["height"]?.ToObject<int>() ?? 0;
+					filename = command.Params["filename"]?.ToString();
 				}
 
 				// Play Mode 中は ScreenCapture を使って UI を含む完全なゲーム画面をキャプチャ
 				if (Application.isPlaying)
 				{
-					return CaptureWithScreenCapture(command.Id, width, height);
+					return CaptureWithScreenCapture(command.Id, width, height, filename);
 				}
 				else
 				{
-					return CaptureWithCamera(command.Id, width, height);
+					return CaptureWithCamera(command.Id, width, height, filename);
 				}
 			}
 			catch (Exception ex)
@@ -76,7 +89,7 @@ namespace Playcaller.Editor.Handlers
 		/// WaitForEndOfFrame 後に呼び出す必要があるため、一時的な MonoBehaviour のコルーチンを使う。
 		/// Task<string> を返し、PlaycallerClient の ProcessCommandAsync で await される。
 		/// </summary>
-		private static Task<string> CaptureWithScreenCapture(string commandId, int width, int height)
+		private static Task<string> CaptureWithScreenCapture(string commandId, int width, int height, string filename)
 		{
 			var tcs = new TaskCompletionSource<string>();
 
@@ -86,48 +99,62 @@ namespace Playcaller.Editor.Handlers
 			helperGo.hideFlags = HideFlags.HideAndDontSave;
 			var helper = helperGo.AddComponent<ScreenshotCoroutineHelper>();
 
-			helper.StartCoroutine(CaptureCoroutine(tcs, commandId, width, height, helperGo));
+			helper.StartCoroutine(CaptureCoroutine(tcs, commandId, width, height, filename, helperGo));
 
 			return tcs.Task;
 		}
 
 		private static IEnumerator CaptureCoroutine(
 			TaskCompletionSource<string> tcs, string commandId,
-			int width, int height, GameObject helperGo)
+			int width, int height, string filename, GameObject helperGo)
 		{
-			// フレームレンダリング完了まで待機
-			// Unity 公式ドキュメントで CaptureScreenshotAsTexture は WaitForEndOfFrame 後に呼ぶことが推奨されている
 			yield return new WaitForEndOfFrame();
 
 			try
 			{
-				Texture2D screenshot = ScreenCapture.CaptureScreenshotAsTexture();
+				Texture2D finalTexture;
+				int captureWidth, captureHeight;
 
-				if (screenshot == null)
+				if (width > 0 && height > 0)
 				{
-					tcs.TrySetResult(PlaycallerResponse.Error(commandId,
-						"ScreenCapture.CaptureScreenshotAsTexture() returned null", "CAPTURE_ERROR"));
-					yield break;
+					// 指定解像度で正確にキャプチャ (Unity Recorder と同じ API)
+					// CaptureScreenshotIntoRenderTexture は RenderTexture の解像度で
+					// Game View 全体（UI 含む）をレンダリングする
+					int tw = Mathf.Clamp(width, 1, 8192);
+					int th = Mathf.Clamp(height, 1, 8192);
+					var rt = new RenderTexture(tw, th, 24);
+					ScreenCapture.CaptureScreenshotIntoRenderTexture(rt);
+
+					// CaptureScreenshotIntoRenderTexture はプラットフォームによって
+					// 水平反転した結果を返す場合がある。Blit で補正する。
+					var correctedRT = RenderTexture.GetTemporary(tw, th, 0);
+					Graphics.Blit(rt, correctedRT, new Vector2(-1, 1), new Vector2(1, 0));
+
+					RenderTexture.active = correctedRT;
+					finalTexture = new Texture2D(tw, th, TextureFormat.RGB24, false);
+					finalTexture.ReadPixels(new Rect(0, 0, tw, th), 0, 0);
+					finalTexture.Apply();
+
+					RenderTexture.active = null;
+					RenderTexture.ReleaseTemporary(correctedRT);
+					rt.Release();
+					UnityEngine.Object.Destroy(rt);
+
+					captureWidth = tw;
+					captureHeight = th;
 				}
-
-				int captureWidth = screenshot.width;
-				int captureHeight = screenshot.height;
-
-				// リサイズが指定されている場合
-				bool needsResize = (width > 0 && width != captureWidth) || (height > 0 && height != captureHeight);
-				Texture2D finalTexture = screenshot;
-
-				if (needsResize)
+				else
 				{
-					int targetWidth = width > 0 ? Mathf.Clamp(width, 1, 4096) : captureWidth;
-					int targetHeight = height > 0 ? Mathf.Clamp(height, 1, 4096) : captureHeight;
-
-					finalTexture = ResizeTexture(screenshot, targetWidth, targetHeight);
-					captureWidth = targetWidth;
-					captureHeight = targetHeight;
-
-					// 元のスクリーンショットを破棄
-					UnityEngine.Object.Destroy(screenshot);
+					// デフォルト: Game View の現在の解像度でキャプチャ
+					finalTexture = ScreenCapture.CaptureScreenshotAsTexture();
+					if (finalTexture == null)
+					{
+						tcs.TrySetResult(PlaycallerResponse.Error(commandId,
+							"ScreenCapture.CaptureScreenshotAsTexture() returned null", "CAPTURE_ERROR"));
+						yield break;
+					}
+					captureWidth = finalTexture.width;
+					captureHeight = finalTexture.height;
 				}
 
 				byte[] imageBytes = finalTexture.EncodeToPNG();
@@ -140,7 +167,7 @@ namespace Playcaller.Editor.Handlers
 					yield break;
 				}
 
-				string filePath = SaveToFile(imageBytes);
+				string filePath = SaveToFile(imageBytes, filename);
 				tcs.TrySetResult(MakeSuccessResponse(commandId, filePath, captureWidth, captureHeight));
 			}
 			catch (Exception ex)
@@ -150,7 +177,6 @@ namespace Playcaller.Editor.Handlers
 			}
 			finally
 			{
-				// ヘルパー GameObject を破棄
 				if (helperGo != null)
 				{
 					UnityEngine.Object.Destroy(helperGo);
@@ -162,7 +188,7 @@ namespace Playcaller.Editor.Handlers
 		/// Play Mode 外: camera.Render() + RenderTexture 方式でキャプチャ。
 		/// Screen Space Overlay UI は映らないが、Editor 非再生時のフォールバックとして使用。
 		/// </summary>
-		private static string CaptureWithCamera(string commandId, int width, int height)
+		private static string CaptureWithCamera(string commandId, int width, int height, string filename)
 		{
 			Camera camera = Camera.main;
 			if (camera == null)
@@ -211,7 +237,7 @@ namespace Playcaller.Editor.Handlers
 					"Failed to encode screenshot", "ENCODE_ERROR");
 			}
 
-			string filePath = SaveToFile(imageBytes);
+			string filePath = SaveToFile(imageBytes, filename);
 			return MakeSuccessResponse(commandId, filePath, captureWidth, captureHeight);
 		}
 

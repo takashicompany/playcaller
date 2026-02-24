@@ -34,7 +34,7 @@ namespace Playcaller.Editor
 		private static string GetPortFilePath()
 		{
 			var projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
-			return System.IO.Path.Combine(projectRoot, "Temp", PortFileName);
+			return System.IO.Path.Combine(projectRoot, "Library", "Playcaller", PortFileName);
 		}
 
 		private static int ReadPortFile()
@@ -65,6 +65,14 @@ namespace Playcaller.Editor
 		private static void Update()
 		{
 			ProcessCommandQueue();
+
+			// ReceiveLoop が終了していれば接続が切れている → クリーンアップ
+			if (_receiveTask != null && _receiveTask.IsCompleted)
+			{
+				CleanupConnection();
+				_receiveTask = null;
+				_cts = null;
+			}
 
 			if (_client == null || !_client.Connected)
 			{

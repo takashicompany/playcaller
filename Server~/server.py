@@ -305,7 +305,7 @@ def _find_unity_project_dir() -> Path:
 
 
 def _get_port_file_path() -> Path:
-    return _find_unity_project_dir() / "Temp" / PORT_FILE_NAME
+    return _find_unity_project_dir() / "Library" / "Playcaller" / PORT_FILE_NAME
 
 
 def _write_port_file(port: int) -> None:
@@ -350,14 +350,18 @@ mcp = FastMCP("playcaller", lifespan=server_lifespan)
 # -- screenshot -------------------------------------------------------------
 
 @mcp.tool()
-async def playcaller_screenshot(width: int = 0, height: int = 0) -> str:
+async def playcaller_screenshot(width: int = 0, height: int = 0, filename: str = "") -> str:
     """Capture a screenshot of the Unity Game View.
 
     Returns the file path of the saved PNG screenshot.
     width/height: optional resolution in pixels (default: Game View size).
+    filename: optional save path (relative to project root, or absolute). Default: Temp/Playcaller/Screenshots/screenshot.png.
     """
     try:
-        result = await unity.send_command("screenshot", {"width": width, "height": height})
+        params: dict[str, Any] = {"width": width, "height": height}
+        if filename:
+            params["filename"] = filename
+        result = await unity.send_command("screenshot", params)
         unity.last_screenshot_width = result["width"]
         unity.last_screenshot_height = result["height"]
         unity.last_screen_width = result.get("screenWidth", result["width"])
@@ -399,6 +403,43 @@ async def playcaller_tap(x: int, y: int, holdDurationMs: int = 0) -> str:
         return f"Tap at ({x}, {y}) - no target hit"
     except Exception as exc:
         return f"Tap failed: {exc}"
+
+
+# -- multi_tap --------------------------------------------------------------
+
+@mcp.tool()
+async def playcaller_multi_tap(
+    taps: list[dict],
+    intervalMs: int = 50,
+) -> str:
+    """Execute multiple taps in rapid succession within a single MCP call.
+
+    taps: list of {x, y} coordinate pairs (screenshot coordinates).
+    intervalMs: delay between taps in milliseconds (default 50, 0-1000).
+    """
+    intervalMs = max(0, min(1000, intervalMs))
+    results: list[str] = []
+    for i, tap in enumerate(taps):
+        x = tap.get("x", 0)
+        y = tap.get("y", 0)
+        hold = tap.get("holdDurationMs", 0)
+        try:
+            result = await unity.send_command("tap", {
+                "x": x, "y": y, "holdDurationMs": hold,
+                "screenshotWidth": unity.last_screenshot_width,
+                "screenshotHeight": unity.last_screenshot_height,
+                "screenWidth": unity.last_screen_width,
+                "screenHeight": unity.last_screen_height,
+            })
+            if result.get("tapped"):
+                results.append(f'[{i}] Tapped "{result.get("targetName")}" at ({x}, {y})')
+            else:
+                results.append(f"[{i}] Tap at ({x}, {y}) - no target hit")
+        except Exception as exc:
+            results.append(f"[{i}] Tap at ({x}, {y}) failed: {exc}")
+        if intervalMs > 0 and i < len(taps) - 1:
+            await asyncio.sleep(intervalMs / 1000.0)
+    return "\n".join(results)
 
 
 # -- drag -------------------------------------------------------------------
@@ -470,6 +511,9 @@ async def playcaller_playmode(action: str) -> str:
     action: "play" to start, "pause" to toggle pause, "stop" to stop, "get_state" to check current state.
     Play/stop will wait for Unity domain reload to complete before returning.
     """
+    if not unity.connected:
+        return f"ERROR: Unity is not connected. The {action} command was NOT sent."
+
     try:
         result = await unity.send_command("playmode", {"action": action})
         text = json.dumps(result, indent=2)
@@ -478,17 +522,22 @@ async def playcaller_playmode(action: str) -> str:
             reconnected = await unity.wait_for_reconnect(15)
             if not reconnected:
                 return (
-                    text + "\n\nWarning: Unity domain reload completed but TCP reconnection timed out. "
-                    "Subsequent commands may fail. Try playcaller_wait with ms=2000 before next command."
+                    text + "\n\nCommand was sent and Unity responded, "
+                    "but TCP reconnection after domain reload timed out. "
+                    "The play/stop action itself succeeded."
                 )
         return text
     except Exception as exc:
         if action in ("play", "stop"):
-            _log("%s command got error (expected during domain reload): %s", action, exc)
+            _log("%s command error: %s", action, exc)
             reconnected = await unity.wait_for_reconnect(15)
             if reconnected:
                 return f"Play Mode {'started' if action == 'play' else 'stopped'} (reconnected after domain reload)"
-            return f"Play Mode {action} sent but reconnection failed after domain reload. Unity may still be reloading."
+            return (
+                f"ERROR: send_command('{action}') raised an exception: {exc}\n"
+                f"UNKNOWN: Whether the {action} command reached Unity.\n"
+                f"FACT: Reconnection failed after 15s."
+            )
         return f"PlayMode command failed: {exc}"
 
 
@@ -549,23 +598,39 @@ async def playcaller_refresh() -> str:
     Use after modifying files outside Unity to ensure changes are picked up.
     If the refresh triggers script recompilation, waits for domain reload to complete.
     """
+    if not unity.connected:
+        return "ERROR: Unity is not connected. The refresh command was NOT sent."
+
     try:
         result = await unity.send_command("refresh")
     except Exception as exc:
-        # Connection lost during refresh likely means domain reload started
-        _log("Refresh command error (possible domain reload): %s", exc)
+        _log("Refresh command error: %s", exc)
         reconnected = await unity.wait_for_reconnect(30)
         if reconnected:
-            return "AssetDatabase refreshed (domain reload completed, reconnected)."
-        return "AssetDatabase refresh triggered domain reload but reconnection timed out. Unity may still be compiling."
+            return (
+                "WARNING: send_command('refresh') raised an exception, "
+                "then reconnection succeeded.\n"
+                "UNKNOWN: Whether the refresh command reached Unity.\n"
+                "Verify independently whether compilation occurred."
+            )
+        return (
+            "ERROR: send_command('refresh') raised an exception: "
+            f"{exc}\n"
+            "UNKNOWN: Whether the refresh command reached Unity.\n"
+            "FACT: Reconnection also failed after 30s."
+        )
 
     if result.get("isCompiling"):
-        # Compilation started — domain reload will follow, connection will drop
+        # send_command 成功 + isCompiling=true → refresh は確実に届き、コンパイル開始
         _log("Refresh triggered compilation, waiting for domain reload...")
         reconnected = await unity.wait_for_reconnect(30)
         if reconnected:
             return "AssetDatabase refreshed (compilation and domain reload completed)."
-        return "AssetDatabase refreshed but compilation/domain reload timed out. Unity may still be compiling."
+        return (
+            "FACT: Refresh command was sent and compilation started.\n"
+            "FACT: Reconnection timed out after 30s.\n"
+            "UNKNOWN: Whether compilation finished."
+        )
 
     return "AssetDatabase refreshed successfully (no recompilation needed)."
 
@@ -648,6 +713,49 @@ async def playcaller_key_press(key: str) -> str:
         return f"Key press result: {json.dumps(result)}"
     except Exception as exc:
         return f"Key press failed: {exc}"
+
+
+# -- game_query -------------------------------------------------------------
+
+@mcp.tool()
+async def playcaller_game_query(queryType: str = "") -> str:
+    """Ask the game what actions are currently available.
+
+    The game responds with available operations, screen coordinates, and expected outcomes.
+    If the game has not implemented query support, an error message is returned.
+
+    queryType: optional query type hint (default: general query).
+    """
+    try:
+        result = await unity.send_command("game_query", {"queryType": queryType})
+        # If result contains a "text" field, return it directly for readability
+        if isinstance(result, dict) and "text" in result:
+            return result["text"]
+        return json.dumps(result, indent=2, ensure_ascii=False)
+    except Exception as exc:
+        return f"Game query failed: {exc}"
+
+
+# -- set_game_view_size -----------------------------------------------------
+
+@mcp.tool()
+async def playcaller_set_game_view_size(width: int, height: int) -> str:
+    """Set the Unity Game View to a specific resolution.
+
+    Uses the same internal mechanism as Unity Recorder.
+    The Game View will render at the exact specified resolution.
+    Useful for capturing store screenshots at specific dimensions (e.g., 1242x2208 for iPhone).
+
+    width: target width in pixels.
+    height: target height in pixels.
+    """
+    try:
+        result = await unity.send_command("set_game_view_size", {
+            "width": width, "height": height,
+        })
+        return result.get("message", json.dumps(result))
+    except Exception as exc:
+        return f"Set Game View size failed: {exc}"
 
 
 # -- get_editor_state -------------------------------------------------------
