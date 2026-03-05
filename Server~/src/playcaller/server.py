@@ -1,10 +1,4 @@
-# /// script
-# requires-python = ">=3.10"
-# dependencies = [
-#     "mcp[cli]>=1.2.0",
-# ]
-# ///
-"""playcaller – Unity MCP server (FastMCP, single-file)."""
+"""playcaller – Unity MCP server."""
 
 from __future__ import annotations
 
@@ -778,5 +772,9 @@ async def playcaller_get_editor_state() -> str:
 # Entry point
 # ---------------------------------------------------------------------------
 
-if __name__ == "__main__":
+def main():
     mcp.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "playcaller"
+version = "0.1.0"
+description = "MCP server that lets AI agents play-test Unity games via screenshot, tap, drag, flick and more"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "takashicompany" }]
+keywords = ["mcp", "unity", "testing", "input-simulation"]
+dependencies = [
+    "mcp[cli]>=1.2.0",
+]
+
+[project.scripts]
+playcaller = "playcaller.server:main"
+
+[project.urls]
+Homepage = "https://github.com/takashicompany/playcaller"
+Repository = "https://github.com/takashicompany/playcaller"
