@@ -1,5 +1,5 @@
 {
-  "name": "com.takashicompany.playcaller",
+  "name": "company.takashi.playcaller",
   "version": "0.1.0",
   "displayName": "Playcaller - Unity MCP Input Simulator",
   "description": "MCP server for coordinate-based input simulation testing in Unity Editor",
