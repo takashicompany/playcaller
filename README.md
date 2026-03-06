@@ -52,6 +52,8 @@ Run the following command:
 claude mcp add playcaller -- uvx playcaller
 ```
 
+If something doesn't work, try asking the AI for help.
+
 ### 3. Verify the connection
 
 Launch Claude Code while the Unity Editor is open, and it will connect automatically.
