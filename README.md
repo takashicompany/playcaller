@@ -1,76 +1,77 @@
 # Playcaller
 
-AIがUnity上で動作するゲームを、実際のプレイヤーのように操作・確認できるMCPサーバーです。
-スクリーンショットの取得、タップ・ドラッグ・フリックなどの入力シミュレーション、Play Modeの制御などをAIエージェントから行えます。
+[日本語はこちら](README_ja.md)
 
-大まかに言うなら **Unity版の [Playwright MCP](https://github.com/anthropics/anthropic-quickstarts/tree/main/mcp-playwright)** です。
+An MCP server that lets AI agents play-test Unity games like a real player.
+It provides screenshot capture, input simulation (tap, drag, flick, key press), Play Mode control, and more — all accessible from AI agents.
 
-## できること
+In short, it's a **[Playwright MCP](https://github.com/anthropics/anthropic-quickstarts/tree/main/mcp-playwright) for Unity**.
 
-- Game View のスクリーンショット取得
-- タップ・ドラッグ・フリック・キー入力のシミュレーション
-- Play Mode の開始・停止・一時停止
-- シーン内の GameObject 階層の取得・詳細確認
-- コンソールログの取得
-- AssetDatabase のリフレッシュ
-- メニューアイテムの実行
-- エディタの状態取得
+## Features
 
-## 苦手なこと
+- Game View screenshot capture
+- Tap, drag, flick, and key input simulation
+- Play Mode start / stop / pause
+- Scene GameObject hierarchy inspection
+- Console log retrieval
+- AssetDatabase refresh
+- Menu item execution
+- Editor state retrieval
 
-- アクション性の高いゲームの動作確認
-- ゲーム体験の総合的な確認
-- 視覚的な演出の評価
+## Limitations
 
-## 要件
+- Not suited for testing fast-paced action games
+- Not suited for evaluating overall game experience
+- Not suited for judging visual effects quality
 
-- Unity 2022.3 以上
-- Python 3.10 以上（[uv](https://docs.astral.sh/uv/) 推奨）
+## Requirements
 
-## 導入手順
+- Unity 2022.3 or later
+- Python 3.10 or later ([uv](https://docs.astral.sh/uv/) recommended)
 
-### 1. Unity パッケージのインストール
+## Setup
 
-1. Unity Editor のメニューバーから **Window > Package Manager** を開く
-2. 左上の **+** ボタンをクリック
-3. **Add package from git URL...** を選択
-4. 以下の URL を入力して **Add** をクリック
+### 1. Install the Unity package
+
+1. Open **Window > Package Manager** in the Unity Editor menu bar
+2. Click the **+** button in the top-left corner
+3. Select **Add package from git URL...**
+4. Enter the following URL and click **Add**
 
 ```
 https://github.com/takashicompany/playcaller.git
 ```
 
-Newtonsoft.Json（`com.unity.nuget.newtonsoft-json`）が未導入の場合は自動的にインストールされます。
+Newtonsoft.Json (`com.unity.nuget.newtonsoft-json`) will be installed automatically if not already present.
 
-### 2. MCP サーバーの登録
+### 2. Register the MCP server
 
-以下を実行してください。
+Run the following command:
 
 ```sh
 claude mcp add playcaller -- uvx playcaller
 ```
 
-うまく動かない時はAIに相談しましょう。
+If something doesn't work, try asking the AI for help.
 
-### 3. 動作確認
+### 3. Verify the connection
 
-Unity Editor を開いた状態で Claude Code を起動すると、自動的に接続されます。
+Launch Claude Code while the Unity Editor is open, and it will connect automatically.
 
-## MCP ツール一覧
+## MCP Tools
 
-| ツール名 | 説明 |
+| Tool | Description |
 |---|---|
-| `playcaller_screenshot` | Game View のスクリーンショットを取得 |
-| `playcaller_tap` | 指定座標をタップ |
-| `playcaller_drag` | ドラッグ操作 |
-| `playcaller_flick` | フリック（クイックスワイプ）操作 |
-| `playcaller_key_press` | キーボード入力 |
-| `playcaller_playmode` | Play Mode の開始・停止・一時停止 |
-| `playcaller_wait` | 指定時間またはフレーム数の待機 |
-| `playcaller_console_log` | Unity コンソールログの取得 |
-| `playcaller_refresh` | AssetDatabase のリフレッシュ |
-| `playcaller_get_hierarchy` | シーン内の GameObject 階層を取得 |
-| `playcaller_get_gameobject` | 特定の GameObject の詳細情報を取得 |
-| `playcaller_execute_menu_item` | Unity Editor のメニューアイテムを実行 |
-| `playcaller_get_editor_state` | エディタの現在の状態を取得 |
-
+| `playcaller_screenshot` | Capture a Game View screenshot |
+| `playcaller_tap` | Tap at specified coordinates |
+| `playcaller_drag` | Drag operation |
+| `playcaller_flick` | Flick (quick swipe) operation |
+| `playcaller_key_press` | Keyboard input |
+| `playcaller_playmode` | Start / stop / pause Play Mode |
+| `playcaller_wait` | Wait for a specified time or frame count |
+| `playcaller_console_log` | Retrieve Unity console logs |
+| `playcaller_refresh` | Refresh AssetDatabase |
+| `playcaller_get_hierarchy` | Get the GameObject hierarchy in the scene |
+| `playcaller_get_gameobject` | Get detailed info about a specific GameObject |
+| `playcaller_execute_menu_item` | Execute a Unity Editor menu item |
+| `playcaller_get_editor_state` | Get the current editor state |
