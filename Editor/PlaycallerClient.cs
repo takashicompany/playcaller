@@ -243,7 +243,12 @@ namespace Playcaller.Editor
 					var completed = await Task.WhenAny(asyncResponse, Task.Delay(CommandTimeoutMs));
 					if (completed != asyncResponse)
 					{
-						Debug.LogWarning($"[Playcaller] Command {command?.Type} timed out after {CommandTimeoutMs}ms");
+						var timeoutMsg = $"[Playcaller] Command {command?.Type} timed out after {CommandTimeoutMs}ms";
+						if (command?.Type == "screenshot")
+						{
+							timeoutMsg += "\nIf HDR is enabled in your project, try using screenshot_hdr instead.";
+						}
+						Debug.LogWarning(timeoutMsg);
 						var errResp = PlaycallerResponse.Error(command?.Id, "Command timed out", "TIMEOUT");
 						SendFramedMessage(errResp);
 						return;
