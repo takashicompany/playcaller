@@ -296,15 +296,12 @@ namespace Playcaller.Editor.Handlers
 				tex.Apply();
 				RenderTexture.active = null;
 
-				// m_RenderTexture は上下反転しているため補正
+				// m_RenderTexture は上下反転しているため行単位でコピーして補正
 				Color[] pixels = tex.GetPixels();
 				Color[] flipped = new Color[pixels.Length];
 				for (int y = 0; y < h; y++)
 				{
-					for (int x = 0; x < w; x++)
-					{
-						flipped[y * w + x] = pixels[(h - 1 - y) * w + x];
-					}
+					Array.Copy(pixels, (h - 1 - y) * w, flipped, y * w, w);
 				}
 				tex.SetPixels(flipped);
 				tex.Apply();
