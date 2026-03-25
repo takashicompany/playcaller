@@ -1,13 +1,17 @@
 {
   "name": "company.takashi.playcaller",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "displayName": "Playcaller - Unity MCP Input Simulator",
   "description": "MCP server for coordinate-based input simulation testing in Unity Editor",
   "unity": "2022.3",
   "dependencies": {
     "com.unity.nuget.newtonsoft-json": "3.2.1"
   },
-  "keywords": ["mcp", "testing", "input-simulation"],
+  "keywords": [
+    "mcp",
+    "testing",
+    "input-simulation"
+  ],
   "author": {
     "name": "takashicompany"
   }
