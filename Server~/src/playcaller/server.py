@@ -374,6 +374,43 @@ async def playcaller_screenshot(width: int = 0, height: int = 0, filename: str =
         return f"Screenshot failed: {exc}"
 
 
+# -- screenshot_hdr ---------------------------------------------------------
+
+@mcp.tool()
+async def playcaller_screenshot_hdr(width: int = 0, height: int = 0, filename: str = "") -> str:
+    """Capture a screenshot using Camera.Render() with HDR-compatible RenderTexture.
+
+    Use this instead of playcaller_screenshot when the project has HDR enabled,
+    which can cause ScreenCapture-based methods to hang.
+    Works in both Play Mode and Edit Mode.
+
+    Returns the file path of the saved PNG screenshot.
+    width/height: optional resolution in pixels (default: camera pixel size).
+    filename: optional save path (relative to project root, or absolute). Default: Temp/Playcaller/Screenshots/screenshot.png.
+    """
+    try:
+        params: dict[str, Any] = {"width": width, "height": height}
+        if filename:
+            params["filename"] = filename
+        result = await unity.send_command("screenshot_hdr", params)
+        unity.last_screenshot_width = result["width"]
+        unity.last_screenshot_height = result["height"]
+        unity.last_screen_width = result.get("screenWidth", result["width"])
+        unity.last_screen_height = result.get("screenHeight", result["height"])
+
+        file_path = result["filePath"]
+        return (
+            f"Screenshot saved: {file_path}\n"
+            f"Size: {result['width']}x{result['height']} "
+            f"(screen: {unity.last_screen_width}x{unity.last_screen_height}).\n"
+            f"Input coordinates for tap/drag/flick should use the screenshot image coordinate system "
+            f"({result['width']}x{result['height']}, top-left origin, Y-down).\n"
+            f"Use the Read tool to view the image file."
+        )
+    except Exception as exc:
+        return f"HDR Screenshot failed: {exc}"
+
+
 # -- tap --------------------------------------------------------------------
 
 @mcp.tool()

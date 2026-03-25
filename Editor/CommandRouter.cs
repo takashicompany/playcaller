@@ -30,6 +30,9 @@ namespace Playcaller.Editor
 				case "screenshot":
 					return ScreenshotHandler.Handle(command);
 
+				case "screenshot_hdr":
+					return ScreenshotHandler.HandleHDR(command);
+
 				case "playmode":
 					return PlayModeHandler.Handle(command);
 

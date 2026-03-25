@@ -262,6 +262,81 @@ namespace Playcaller.Editor.Handlers
 
 			return result;
 		}
+
+		/// <summary>
+		/// HDR 対応スクリーンショット。
+		/// Camera.Render() + RenderTextureFormat.DefaultHDR を使用するため、
+		/// HDR が有効なプロジェクトでも ScreenCapture のようにハングしない。
+		/// Play Mode / 非 Play Mode どちらでも動作する。
+		/// </summary>
+		public static object HandleHDR(PlaycallerCommand command)
+		{
+			try
+			{
+				int width = 0;
+				int height = 0;
+				string filename = null;
+
+				if (command.Params != null)
+				{
+					width = command.Params["width"]?.ToObject<int>() ?? 0;
+					height = command.Params["height"]?.ToObject<int>() ?? 0;
+					filename = command.Params["filename"]?.ToString();
+				}
+
+				Camera camera = Camera.main;
+				if (camera == null)
+				{
+					var cameras = Camera.allCameras;
+					if (cameras.Length > 0)
+						camera = cameras[0];
+				}
+
+				if (camera == null)
+				{
+					return PlaycallerResponse.Error(command.Id,
+						"No camera available for screenshot", "NO_CAMERA");
+				}
+
+				int captureWidth = width > 0 ? width : camera.pixelWidth;
+				int captureHeight = height > 0 ? height : camera.pixelHeight;
+				captureWidth = Mathf.Clamp(captureWidth, 1, 8192);
+				captureHeight = Mathf.Clamp(captureHeight, 1, 8192);
+
+				var renderTexture = new RenderTexture(captureWidth, captureHeight, 24, RenderTextureFormat.DefaultHDR);
+				var previousTarget = camera.targetTexture;
+
+				camera.targetTexture = renderTexture;
+				camera.Render();
+
+				RenderTexture.active = renderTexture;
+				var screenshot = new Texture2D(captureWidth, captureHeight, TextureFormat.RGB24, false);
+				screenshot.ReadPixels(new Rect(0, 0, captureWidth, captureHeight), 0, 0);
+				screenshot.Apply();
+
+				camera.targetTexture = previousTarget;
+				RenderTexture.active = null;
+
+				byte[] imageBytes = screenshot.EncodeToPNG();
+
+				UnityEngine.Object.DestroyImmediate(renderTexture);
+				UnityEngine.Object.DestroyImmediate(screenshot);
+
+				if (imageBytes == null || imageBytes.Length == 0)
+				{
+					return PlaycallerResponse.Error(command.Id,
+						"Failed to encode screenshot", "ENCODE_ERROR");
+				}
+
+				string filePath = SaveToFile(imageBytes, filename);
+				return MakeSuccessResponse(command.Id, filePath, captureWidth, captureHeight);
+			}
+			catch (Exception ex)
+			{
+				return PlaycallerResponse.Error(command.Id,
+					$"HDR Screenshot failed: {ex.Message}", "SCREENSHOT_HDR_ERROR");
+			}
+		}
 	}
 
 	/// <summary>
