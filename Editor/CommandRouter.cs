@@ -30,6 +30,9 @@ namespace Playcaller.Editor
 				case "screenshot":
 					return ScreenshotHandler.Handle(command);
 
+				case "read_gameview_pixels":
+					return ScreenshotHandler.HandleReadGameViewPixels(command);
+
 				case "playmode":
 					return PlayModeHandler.Handle(command);
 
