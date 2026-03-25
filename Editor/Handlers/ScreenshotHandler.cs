@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.IO;
+using System.Reflection;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEditor;
@@ -239,6 +240,92 @@ namespace Playcaller.Editor.Handlers
 
 			string filePath = SaveToFile(imageBytes, filename);
 			return MakeSuccessResponse(commandId, filePath, captureWidth, captureHeight);
+		}
+
+		/// <summary>
+		/// GameView の内部 RenderTexture (m_RenderTexture) を直接読み取ってキャプチャする。
+		/// Screen Space Overlay Canvas UI を含む GameView 全体が取得できる。
+		/// ScreenCapture API を使わないため、HDR 有効時でもハングしない。
+		/// </summary>
+		public static string HandleReadGameViewPixels(PlaycallerCommand command)
+		{
+			try
+			{
+				string filename = null;
+				if (command.Params != null)
+				{
+					filename = command.Params["filename"]?.ToString();
+				}
+
+				var gameViewType = Type.GetType("UnityEditor.GameView,UnityEditor");
+				if (gameViewType == null)
+				{
+					return PlaycallerResponse.Error(command.Id,
+						"GameView type not found", "GAMEVIEW_ERROR");
+				}
+
+				var gameView = EditorWindow.GetWindow(gameViewType, false, null, false);
+				if (gameView == null)
+				{
+					return PlaycallerResponse.Error(command.Id,
+						"GameView window not found", "GAMEVIEW_ERROR");
+				}
+
+				var rtField = gameViewType.GetField("m_RenderTexture",
+					BindingFlags.NonPublic | BindingFlags.Instance);
+				if (rtField == null)
+				{
+					return PlaycallerResponse.Error(command.Id,
+						"m_RenderTexture field not found", "GAMEVIEW_ERROR");
+				}
+
+				var renderTexture = rtField.GetValue(gameView) as RenderTexture;
+				if (renderTexture == null)
+				{
+					return PlaycallerResponse.Error(command.Id,
+						"m_RenderTexture is null (GameView may not be visible)",
+						"GAMEVIEW_ERROR");
+				}
+
+				int w = renderTexture.width;
+				int h = renderTexture.height;
+
+				RenderTexture.active = renderTexture;
+				var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
+				tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+				tex.Apply();
+				RenderTexture.active = null;
+
+				// m_RenderTexture は上下反転しているため補正
+				Color[] pixels = tex.GetPixels();
+				Color[] flipped = new Color[pixels.Length];
+				for (int y = 0; y < h; y++)
+				{
+					for (int x = 0; x < w; x++)
+					{
+						flipped[y * w + x] = pixels[(h - 1 - y) * w + x];
+					}
+				}
+				tex.SetPixels(flipped);
+				tex.Apply();
+
+				byte[] imageBytes = tex.EncodeToPNG();
+				UnityEngine.Object.DestroyImmediate(tex);
+
+				if (imageBytes == null || imageBytes.Length == 0)
+				{
+					return PlaycallerResponse.Error(command.Id,
+						"Failed to encode image", "ENCODE_ERROR");
+				}
+
+				string filePath = SaveToFile(imageBytes, filename);
+				return MakeSuccessResponse(command.Id, filePath, w, h);
+			}
+			catch (Exception ex)
+			{
+				return PlaycallerResponse.Error(command.Id,
+					$"GameView read pixels failed: {ex.Message}", "GAMEVIEW_ERROR");
+			}
 		}
 
 		/// <summary>

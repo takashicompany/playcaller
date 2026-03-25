@@ -374,6 +374,40 @@ async def playcaller_screenshot(width: int = 0, height: int = 0, filename: str =
         return f"Screenshot failed: {exc}"
 
 
+# -- read_gameview_pixels ---------------------------------------------------
+
+@mcp.tool()
+async def playcaller_read_gameview_pixels(filename: str = "") -> str:
+    """Read pixels directly from the Unity GameView's internal render texture.
+
+    Captures the GameView buffer including Screen Space Overlay Canvas UI.
+    Returns the file path of the saved PNG image.
+    filename: optional save path (relative to project root, or absolute). Default: Temp/Playcaller/Screenshots/screenshot.png.
+    This is useful when playcaller_screenshot fails or hangs (e.g. when HDR is enabled in URP/HDRP settings).
+    """
+    try:
+        params: dict[str, Any] = {}
+        if filename:
+            params["filename"] = filename
+        result = await unity.send_command("read_gameview_pixels", params)
+        unity.last_screenshot_width = result["width"]
+        unity.last_screenshot_height = result["height"]
+        unity.last_screen_width = result.get("screenWidth", result["width"])
+        unity.last_screen_height = result.get("screenHeight", result["height"])
+
+        file_path = result["filePath"]
+        return (
+            f"Screenshot saved: {file_path}\n"
+            f"Size: {result['width']}x{result['height']} "
+            f"(screen: {unity.last_screen_width}x{unity.last_screen_height}).\n"
+            f"Input coordinates for tap/drag/flick should use the screenshot image coordinate system "
+            f"({result['width']}x{result['height']}, top-left origin, Y-down).\n"
+            f"Use the Read tool to view the image file."
+        )
+    except Exception as exc:
+        return f"Read GameView pixels failed: {exc}"
+
+
 # -- tap --------------------------------------------------------------------
 
 @mcp.tool()
