@@ -538,6 +538,7 @@ async def playcaller_playmode(action: str) -> str:
 
     action: "play" to start, "pause" to toggle pause, "stop" to stop, "get_state" to check current state.
     Play/stop will wait for Unity domain reload to complete before returning.
+    Note: If the game does not progress after starting Play Mode via MCP, the project's "Run In Background" setting may be disabled. Set Application.runInBackground = true in the game or in Player Settings.
     """
     if not unity.connected:
         return f"ERROR: Unity is not connected. The {action} command was NOT sent."
