@@ -58,12 +58,38 @@ If something doesn't work, try asking the AI for help.
 
 Launch Claude Code while the Unity Editor is open, and it will connect automatically.
 
+## Updating
+
+### Unity package
+
+1. Open **Window > Package Manager**
+2. Select **Playcaller** from the list
+3. Click **Update**
+
+### MCP server (PyPI)
+
+```sh
+uvx --upgrade playcaller
+```
+
+## Notes
+
+### Run In Background
+
+If the game does not progress after starting Play Mode via MCP, the project's "Run In Background" setting may be disabled. Enable it in **Edit > Project Settings > Player > Resolution and Presentation > Run In Background**, or set `Application.runInBackground = true` in your game code.
+
+### HDR projects
+
+In URP/HDRP projects with HDR enabled, `playcaller_screenshot` may hang due to a [known Unity issue](https://discussions.unity.com/t/screencapture-capturescreenshot-fails-when-hdr-is-enabled/896701). Use `playcaller_read_gameview_pixels` instead, which reads the GameView's internal buffer directly and works with HDR.
+
 ## MCP Tools
 
 | Tool | Description |
 |---|---|
 | `playcaller_screenshot` | Capture a Game View screenshot |
+| `playcaller_read_gameview_pixels` | Capture Game View by reading internal buffer (HDR compatible) |
 | `playcaller_tap` | Tap at specified coordinates |
+| `playcaller_multi_tap` | Execute multiple taps in sequence |
 | `playcaller_drag` | Drag operation |
 | `playcaller_flick` | Flick (quick swipe) operation |
 | `playcaller_key_press` | Keyboard input |
@@ -75,3 +101,5 @@ Launch Claude Code while the Unity Editor is open, and it will connect automatic
 | `playcaller_get_gameobject` | Get detailed info about a specific GameObject |
 | `playcaller_execute_menu_item` | Execute a Unity Editor menu item |
 | `playcaller_get_editor_state` | Get the current editor state |
+| `playcaller_game_query` | Send a custom query to the running game |
+| `playcaller_set_game_view_size` | Set the Game View resolution |

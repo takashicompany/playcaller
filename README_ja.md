@@ -56,12 +56,38 @@ claude mcp add playcaller -- uvx playcaller
 
 Unity Editor を開いた状態で Claude Code を起動すると、自動的に接続されます。
 
+## アップデート
+
+### Unity パッケージ
+
+1. **Window > Package Manager** を開く
+2. リストから **Playcaller** を選択
+3. **Update** をクリック
+
+### MCP サーバー（PyPI）
+
+```sh
+uvx --upgrade playcaller
+```
+
+## 注意事項
+
+### Run In Background
+
+MCP経由でPlay Modeを開始した後、ゲームが進行しない場合は「Run In Background」が無効になっている可能性があります。**Edit > Project Settings > Player > Resolution and Presentation > Run In Background** を有効にするか、ゲームコード内で `Application.runInBackground = true` を設定してください。
+
+### HDR プロジェクト
+
+URP/HDRP で HDR が有効なプロジェクトでは、`playcaller_screenshot` が [Unity の既知の問題](https://discussions.unity.com/t/screencapture-capturescreenshot-fails-when-hdr-is-enabled/896701) によりハングすることがあります。代わりに `playcaller_read_gameview_pixels` を使用してください。GameView の内部バッファを直接読み取るため、HDR 環境でも動作します。
+
 ## MCP ツール一覧
 
 | ツール名 | 説明 |
 |---|---|
 | `playcaller_screenshot` | Game View のスクリーンショットを取得 |
+| `playcaller_read_gameview_pixels` | GameView の内部バッファを読み取ってキャプチャ（HDR対応） |
 | `playcaller_tap` | 指定座標をタップ |
+| `playcaller_multi_tap` | 複数のタップを連続実行 |
 | `playcaller_drag` | ドラッグ操作 |
 | `playcaller_flick` | フリック（クイックスワイプ）操作 |
 | `playcaller_key_press` | キーボード入力 |
@@ -73,3 +99,5 @@ Unity Editor を開いた状態で Claude Code を起動すると、自動的に
 | `playcaller_get_gameobject` | 特定の GameObject の詳細情報を取得 |
 | `playcaller_execute_menu_item` | Unity Editor のメニューアイテムを実行 |
 | `playcaller_get_editor_state` | エディタの現在の状態を取得 |
+| `playcaller_game_query` | 実行中のゲームにカスタムクエリを送信 |
+| `playcaller_set_game_view_size` | Game View の解像度を設定 |
