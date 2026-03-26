@@ -70,6 +70,8 @@ Unity Editor を開いた状態で Claude Code を起動すると、自動的に
 uvx --upgrade playcaller
 ```
 
+その後、Claude Codeを再起動で反映。
+
 ## 注意事項
 
 ### Run In Background
