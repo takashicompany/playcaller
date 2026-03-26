@@ -72,6 +72,8 @@ Launch Claude Code while the Unity Editor is open, and it will connect automatic
 uvx --upgrade playcaller
 ```
 
+and restart Claude Code.
+
 ## Notes
 
 ### Run In Background
